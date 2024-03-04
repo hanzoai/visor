@@ -155,15 +155,16 @@ class AssetEditPage extends React.Component {
 
   omitSetting(assset) {
     if (assset.category === "Machine") {
-      assset.databaseType = "";
       assset.authType = "";
       assset.defaultDatabase = "";
       assset.databaseUrl = "";
       assset.useDatabaseUrl = false;
-      assset.databaseFile = "";
-      assset.connectionColor = "";
     } else if (assset.category === "Database") {
-      assset.protocol = "";
+      assset.autoQuery = false;
+      assset.isPermanent = false;
+      assset.remoteApps = [];
+      assset.services = [];
+      assset.enableRemoteApp = false;
     }
     return assset;
   }
@@ -222,7 +223,7 @@ class AssetEditPage extends React.Component {
               ].map((item) => Setting.getOption(item.label, item.value))}
               onChange={value => {
                 this.updateAssetField("category", value);
-                this.updateAssetField("protocol", value === "Machine" ? "rdp" : "");
+                this.updateAssetField("type", "");
               }}
             />
           </Col>
@@ -364,33 +365,38 @@ class AssetEditPage extends React.Component {
                 </Col>
               </Row>
               {
-                asset.protocol === "rdp" && (
-                  <Row style={{marginTop: "20px"}} >
-                    <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-                      {Setting.getLabel(i18next.t("general:Enable Remote App"), i18next.t("general:Enable Remote App - Tooltip"))} :
-                    </Col>
-                    <Col span={22}>
-                      <Switch checked={asset.enableRemoteApp} onChange={checked => {
-                        if (checked && asset.remoteApps.length === 0) {
-                          Setting.showMessage("error", i18next.t("asset:Cannot enable Remote App when Remote Apps are empty. Please add at least one Remote App in below table first, then enable again"));
-                          return;
-                        }
-                        this.updateAssetField("enableRemoteApp", checked);
-                      }} />
-                    </Col>
-                  </Row>
+                asset.type === "RDP" && (
+                  <React.Fragment>
+                    <Row style={{marginTop: "20px"}} >
+                      <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+                        {Setting.getLabel(i18next.t("general:Enable Remote App"), i18next.t("general:Enable Remote App - Tooltip"))} :
+                      </Col>
+                      <Col span={22}>
+                        <Switch checked={asset.enableRemoteApp} onChange={checked => {
+                          if (checked && asset.remoteApps.length === 0) {
+                            Setting.showMessage("error", i18next.t("asset:Cannot enable Remote App when Remote Apps are empty. Please add at least one Remote App in below table first, then enable again"));
+                            return;
+                          }
+                          this.updateAssetField("enableRemoteApp", checked);
+                        }} />
+                      </Col>
+                    </Row>
+                    <Row style={{marginTop: "20px"}} >
+                      <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2} >
+                        {Setting.getLabel(i18next.t("general:Remote Apps"), i18next.t("general:Remote Apps - Tooltip"))} :
+                      </Col>
+                      <Col span={22} >
+                        <RemoteAppTable title={"Remote Apps"} table={asset.remoteApps} onUpdateTable={(value) => {
+                          this.updateAssetField("remoteApps", value);
+                          if (value.length === 0) {
+                            this.updateAssetField("enableRemoteApp", false);
+                          }
+                        }} />
+                      </Col>
+                    </Row>
+                  </React.Fragment>
                 )
               }
-              <Row style={{marginTop: "20px"}} >
-                <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2} >
-                  {Setting.getLabel(i18next.t("general:Remote Apps"), i18next.t("general:Remote Apps - Tooltip"))} :
-                </Col>
-                <Col span={22} >
-                  <RemoteAppTable title={"Remote Apps"} table={asset.remoteApps} onUpdateTable={(value) => {
-                    this.updateAssetField("remoteApps", value);
-                  }} />
-                </Col>
-              </Row>
               <Row style={{marginTop: "20px"}} >
                 <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2} >
                   {Setting.getLabel(i18next.t("general:Services"), i18next.t("general:Services - Tooltip"))} :
