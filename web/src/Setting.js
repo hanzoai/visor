@@ -326,3 +326,23 @@ export function GetIdFromObject(obj) {
   }
   return `${obj.owner}/${obj.name}`;
 }
+
+export function getDataBaseTypes() {
+  return [
+    {label: "MySQL", value: "MySQL", text: "MySQL"},
+    {label: "Microsoft SQL Server", value: "Microsoft SQL Server", text: "Microsoft SQL Server"},
+    {label: "Oracle", value: "Oracle", text: "Oracle"},
+    {label: "PostgreSQL", value: "PostgreSQL", text: "PostgreSQL"},
+    {label: "Redis", value: "Redis", text: "Redis"},
+    {label: "MongoDB", value: "MongoDB", text: "MongoDB"},
+  ];
+}
+
+export function getMachineTypes() {
+  return [
+    {label: "RDP", value: "RDP", text: "RDP"},
+    {label: "VNC", value: "VNC", text: "VNC"},
+    {label: "SSH", value: "SSH", text: "SSH"},
+    {label: "Telnet", value: "Telnet", text: "Telnet"},
+  ];
+}

@@ -14,7 +14,7 @@
 
 import React from "react";
 import {Link} from "react-router-dom";
-import {Button, Switch, Table} from "antd";
+import {Button, Table, Tag} from "antd";
 import BaseListPage from "./BaseListPage";
 import moment from "moment";
 import * as Setting from "./Setting";
@@ -32,18 +32,17 @@ class AssetListPage extends BaseListPage {
       owner: this.props.account.owner,
       name: `machine_${this.state.data.length + 1}`,
       createdTime: moment().format(),
-      description: `New Machine - ${this.state.data.length}`,
+      displayName: `New Machine - ${this.state.data.length}`,
+      category: "Machine",
       protocol: "rdp",
       ip: "127.0.0.1",
       port: 3389,
       username: "Administrator",
       password: "123",
       language: "zh",
+      Os: "Windows",
       autoQuery: false,
       isPermanent: true,
-      // remoteAppName:"",
-      // remoteAppDir:"",
-      // remoteAppArgs:"",
       remoteApps: [],
       services: [],
     };
@@ -121,46 +120,53 @@ class AssetListPage extends BaseListPage {
         dataIndex: "createdTime",
         key: "createdTime",
         width: "160px",
-        // sorter: true,
         sorter: (a, b) => a.createdTime.localeCompare(b.createdTime),
-        render: (text, asset, index) => {
+        render: (text, record, index) => {
           return Setting.getFormattedDate(text);
         },
       },
       {
-        title: i18next.t("general:Description"),
-        dataIndex: "description",
-        key: "description",
-        // width: '200px',
-        sorter: (a, b) => a.description.localeCompare(b.description),
+        title: i18next.t("general:Display name"),
+        dataIndex: "displayName",
+        key: "displayName",
+        width: "150px",
+        sorter: (a, b) => a.displayName.localeCompare(b.displayName),
       },
       {
-        title: i18next.t("general:Protocol"),
-        dataIndex: "protocol",
-        key: "protocol",
-        width: "50px",
-        sorter: true,
+        title: i18next.t("general:Category"),
+        dataIndex: "category",
+        key: "category",
+        width: "100px",
         filterMultiple: false,
         filters: [
-          {text: "RDP", value: "RDP"},
-          {text: "VNC", value: "VNC"},
-          {text: "SSH", value: "SSH"},
-          {text: "", value: "-"},
+          {text: "Machine", value: "Machine"},
+          {text: "Database", value: "Database"},
         ],
+        sorter: true,
+        render: (text, record, index) => {
+          return <Tag color={text === "Machine" ? "blue" : "green"}>{text}</Tag>;
+        },
       },
       {
-        title: i18next.t("general:IP"),
-        dataIndex: "ip",
-        key: "ip",
+        title: i18next.t("general:Type"),
+        dataIndex: "type",
+        key: "type",
+        width: "100px",
+        sorter: true,
+        filterMultiple: false,
+        filters: Setting.getMachineTypes().concat(Setting.getDataBaseTypes()),
+      },
+      {
+        title: i18next.t("general:Endpoint"),
+        dataIndex: "endpoint",
+        key: "endpoint",
         width: "120px",
-        sorter: (a, b) => a.ip.localeCompare(b.ip),
       },
       {
         title: i18next.t("general:Port"),
         dataIndex: "port",
         key: "port",
         width: "90px",
-        sorter: (a, b) => a.port - b.port,
       },
       {
         title: i18next.t("general:Username"),
@@ -170,94 +176,39 @@ class AssetListPage extends BaseListPage {
         sorter: (a, b) => a.username.localeCompare(b.username),
       },
       {
-        title: i18next.t("general:Language"),
-        dataIndex: "language",
-        key: "language",
-        width: "90px",
-        sorter: (a, b) => a.language.localeCompare(b.language),
-      },
-      {
-        title: i18next.t("general:Auto query"),
-        dataIndex: "autoQuery",
-        key: "autoQuery",
-        width: "100px",
-        render: (text, record, index) => {
-          return (
-            <Switch disabled checked={text} />
-          );
-        },
-      },
-      {
-        title: i18next.t("general:Is permanent"),
-        dataIndex: "isPermanent",
-        key: "isPermanent",
-        width: "110px",
-        render: (text, record, index) => {
-          return (
-            <Switch disabled checked={text} />
-          );
-        },
-      },
-      {
-        title: i18next.t("general:Enable Remote App"),
-        dataIndex: "enableRemoteApp",
-        key: "enableRemoteApp",
-        width: "150px",
-        render: (text, record, index) => {
-          return (
-            <Switch disabled checked={text} />
-          );
-        },
-      },
-      {
-        title: i18next.t("general:Remote Apps"),
-        dataIndex: "remoteApps",
-        key: "remoteApps",
-        width: "120px",
-        // todo: fix filter
-        render: (text, record, index) => {
-          return `${record.enableRemoteApp ? 1 : 0}  / ${record.remoteApps === null ? 0 : record.remoteApps.length}`;
-        },
-      },
-      // {
-      //   title: i18next.t("general:Services"),
-      //   dataIndex: "services",
-      //   key: "services",
-      //   width: "90px",
-      //   // todo: fix filter
-      //   render: (text, record, index) => {
-      //     return `${record.services.filter(service => service.status === "Running").length} / ${record.services.length}`;
-      //   },
-      // },
-      {
         title: i18next.t("general:Action"),
         dataIndex: "action",
         key: "action",
         width: "260px",
         fixed: (Setting.isMobile()) ? "false" : "right",
-        render: (text, asset, index) => {
+        render: (text, record, index) => {
           return (
             <div>
               <Button
-                disabled={!Setting.isAdminUser(this.props.account) && (asset.owner !== this.props.account.owner)}
+                disabled={!Setting.isAdminUser(this.props.account) && (record.owner !== this.props.account.owner)}
                 style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}}
                 type="primary"
                 onClick={() => {
-                  const link = `access/${asset.owner}/${asset.name}`;
-                  Setting.openLink(link);
+                  if (record.category === "Machine") {
+                    const link = `access/${record.owner}/${record.name}`;
+                    Setting.openLink(link);
+                  } else if (record.category === "Database") {
+                    const link = "databases";
+                    Setting.openLink(link);
+                  }
                 }}
               >
                 {i18next.t("general:Connect")}
               </Button>
               <Button
-                disabled={!Setting.isAdminUser(this.props.account) && (asset.owner !== this.props.account.owner)}
+                disabled={!Setting.isAdminUser(this.props.account) && (record.owner !== this.props.account.owner)}
                 style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}}
-                onClick={() => this.props.history.push(`/assets/${asset.owner}/${asset.name}`)}
+                onClick={() => this.props.history.push(`/assets/${record.owner}/${record.name}`)}
               >{i18next.t("general:Edit")}
               </Button>
               <PopconfirmModal
-                disabled={!Setting.isAdminUser(this.props.account) && (asset.owner !== this.props.account.owner)}
-                title={i18next.t("general:Sure to delete") + `: ${asset.name} ?`}
+                disabled={!Setting.isAdminUser(this.props.account) && (record.owner !== this.props.account.owner)}
+                title={i18next.t("general:Sure to delete") + `: ${record.name} ?`}
                 onConfirm={() => this.deleteAsset(index)}
               >
               </PopconfirmModal>
@@ -294,7 +245,10 @@ class AssetListPage extends BaseListPage {
   fetch = (params = {}) => {
     let field = params.searchedColumn, value = params.searchText;
     const sortField = params.sortField, sortOrder = params.sortOrder;
-    if (params.type !== undefined && params.type !== null) {
+    if (params.category) {
+      field = "category";
+      value = params.category;
+    } else if (params.type) {
       field = "type";
       value = params.type;
     }

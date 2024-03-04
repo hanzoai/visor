@@ -273,9 +273,9 @@ func (c *ApiController) TunnelMonitor() {
 }
 
 func setConfig(propertyMap map[string]string, asset *object.Asset, configuration *guacamole.Configuration) {
-	configuration.Protocol = asset.Protocol
+	configuration.Protocol = asset.Type
 
-	configuration.SetParameter("hostname", asset.Ip)
+	configuration.SetParameter("hostname", asset.Endpoint)
 	configuration.SetParameter("port", strconv.Itoa(asset.Port))
 	configuration.SetParameter("username", asset.Username)
 	configuration.SetParameter("password", asset.Password)

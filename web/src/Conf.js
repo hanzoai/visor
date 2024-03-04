@@ -31,3 +31,5 @@ export const ThemeDefault = {
   borderRadius: 6,
   isCompact: false,
 };
+
+export const dbgateUrl = "http://localhost:5001";

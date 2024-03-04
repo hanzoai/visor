@@ -45,18 +45,19 @@ type Asset struct {
 	Name        string `xorm:"varchar(100) notnull pk" json:"name"`
 	CreatedTime string `xorm:"varchar(100)" json:"createdTime"`
 
-	Description string `xorm:"varchar(100)" json:"description"`
-	Protocol    string `xorm:"varchar(100)" json:"protocol"`
-	Ip          string `xorm:"varchar(100)" json:"ip"`
+	DisplayName string `xorm:"varchar(100)" json:"displayName"`
+	Endpoint    string `xorm:"varchar(100)" json:"endpoint"`
 	Port        int    `json:"port"`
 	Username    string `xorm:"varchar(100)" json:"username"`
-	Password    string `xorm:"varchar(100)" json:"password"`
-	Language    string `xorm:"varchar(100)" json:"language"`
-	Tag         string `xorm:"varchar(100)" json:"tag"`
+	Password    string `xorm:"varchar(200)" json:"password"`
+	Language    string `xorm:"varchar(20)" json:"language"`
+	Category    string `xorm:"varchar(20)" json:"category"`
+	Tag         string `xorm:"varchar(200)" json:"tag"`
 	Os          string `xorm:"varchar(100)" json:"os"`
-	AutoQuery   bool   `json:"autoQuery"`
-	IsPermanent bool   `json:"isPermanent"`
 
+	Type            string       `xorm:"varchar(100)" json:"type"`
+	AutoQuery       bool         `json:"autoQuery"`
+	IsPermanent     bool         `json:"isPermanent"`
 	EnableRemoteApp bool         `json:"enableRemoteApp"`
 	RemoteApps      []*RemoteApp `json:"remoteApps"`
 	Services        []*Service   `json:"services"`
