@@ -44,18 +44,19 @@ type Asset struct {
 	Owner       string `xorm:"varchar(100) notnull pk" json:"owner"`
 	Name        string `xorm:"varchar(100) notnull pk" json:"name"`
 	CreatedTime string `xorm:"varchar(100)" json:"createdTime"`
-
 	DisplayName string `xorm:"varchar(100)" json:"displayName"`
-	Endpoint    string `xorm:"varchar(100)" json:"endpoint"`
-	Port        int    `json:"port"`
-	Username    string `xorm:"varchar(100)" json:"username"`
-	Password    string `xorm:"varchar(200)" json:"password"`
-	Language    string `xorm:"varchar(20)" json:"language"`
-	Category    string `xorm:"varchar(20)" json:"category"`
-	Tag         string `xorm:"varchar(200)" json:"tag"`
-	Os          string `xorm:"varchar(100)" json:"os"`
 
-	Type            string       `xorm:"varchar(100)" json:"type"`
+	Category string `xorm:"varchar(20)" json:"category"`
+	Type     string `xorm:"varchar(100)" json:"type"`
+	Tag      string `xorm:"varchar(200)" json:"tag"`
+
+	Endpoint string `xorm:"varchar(100)" json:"endpoint"`
+	Port     int    `json:"port"`
+	Username string `xorm:"varchar(100)" json:"username"`
+	Password string `xorm:"varchar(200)" json:"password"`
+
+	Os              string       `xorm:"varchar(100)" json:"os"`
+	Language        string       `xorm:"varchar(20)" json:"language"`
 	AutoQuery       bool         `json:"autoQuery"`
 	IsPermanent     bool         `json:"isPermanent"`
 	EnableRemoteApp bool         `json:"enableRemoteApp"`

@@ -235,7 +235,7 @@ class AssetEditPage extends React.Component {
             </Col>
             <Col span={22} >
               <Select virtual={false} style={{width: "100%"}} value={asset.type}
-                options={Setting.getMachineTypes().map((item) => Setting.getOption(item.label, item.value))}
+                options={Setting.getMachineTypes().map((item) => Setting.getOption(item, item))}
                 onChange={value => {
                   this.updateAssetField("type", value);
                   this.updateAssetField("port", this.getDefaultPort(value));
@@ -252,7 +252,7 @@ class AssetEditPage extends React.Component {
             </Col>
             <Col span={22} >
               <Select virtual={false} style={{width: "100%"}} value={asset.type}
-                options={Setting.getDataBaseTypes().map((item) => Setting.getOption(item.label, item.value))}
+                options={Setting.getDatabaseTypes().map((item) => Setting.getOption(item, item))}
                 onChange={value => {
                   this.updateAssetField("type", value);
                   this.updateAssetField("port", this.getDefaultPort(value));

@@ -154,7 +154,7 @@ class AssetListPage extends BaseListPage {
         width: "100px",
         sorter: true,
         filterMultiple: false,
-        filters: Setting.getMachineTypes().concat(Setting.getDataBaseTypes()),
+        filters: Setting.getMachineTypes().concat(Setting.getDatabaseTypes()).map((item) => {return {text: item, value: item};}),
       },
       {
         title: i18next.t("general:Endpoint"),
