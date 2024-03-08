@@ -14,10 +14,20 @@
 
 import React from "react";
 import {dbgateUrl} from "./Conf";
-const DatabasesPage = () => {
+const DatabasesPage = (props) => {
+  const {activeKey} = props;
+
+  const getHeight = () => {
+    if (activeKey) {
+      return "calc(100vh - 40px)";
+    } else {
+      return "100vh";
+    }
+  };
+
   return (
     <div >
-      <iframe src={dbgateUrl} style={{width: "100%", height: "100vh"}} />;
+      <iframe src={dbgateUrl} style={{width: "100%", height: getHeight()}} />;
     </div>
   );
 };

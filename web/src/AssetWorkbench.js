@@ -28,7 +28,7 @@ class AssetWorkbench extends React.Component {
 
   handleAssetSelect = (assetId) => {
     const arr = assetId.split("/");
-    const asset = {owner: arr[0], name: arr[1]};
+    const asset = {owner: arr[0], name: arr[1], category: arr[2]};
     this.setState({
       selectedAsset: asset,
     });

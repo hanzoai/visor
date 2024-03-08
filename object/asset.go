@@ -17,9 +17,16 @@ package object
 import (
 	"fmt"
 
+	"github.com/casbin/casvisor/dbgate"
 	"github.com/casbin/casvisor/util"
 	"xorm.io/core"
 )
+
+var dataStore *dbgate.JsonLinesDatabase
+
+func init() {
+	dataStore = dbgate.NewConnectionDataStore()
+}
 
 type Service struct {
 	No             int    `json:"no"`
@@ -62,6 +69,15 @@ type Asset struct {
 	EnableRemoteApp bool         `json:"enableRemoteApp"`
 	RemoteApps      []*RemoteApp `json:"remoteApps"`
 	Services        []*Service   `json:"services"`
+
+	Id              string `xorm:"varchar(100)" json:"id"`
+	DatabaseUrl     string `xorm:"varchar(200)" json:"databaseUrl"`
+	UseDatabaseUrl  bool   `json:"useDatabaseUrl"`
+	DatabaseFile    string `xorm:"varchar(200)" json:"databaseFile"`
+	SocketPath      string `xorm:"varchar(200)" json:"socketPath"`
+	AuthType        string `xorm:"varchar(100)" json:"authType"`
+	DefaultDatabase string `xorm:"varchar(100)" json:"defaultDatabase"`
+	IsReadOnly      bool   `json:"isReadOnly"`
 }
 
 func GetAssetCount(owner, field, value string) (int64, error) {
@@ -146,18 +162,23 @@ func GetMaskedAssets(assets []*Asset, errs ...error) ([]*Asset, error) {
 
 func UpdateAsset(id string, asset *Asset) (bool, error) {
 	owner, name := util.GetOwnerAndNameFromId(id)
-	p, err := getAsset(owner, name)
+	oldAsset, err := getAsset(owner, name)
 	if err != nil {
 		return false, err
-	} else if p == nil {
+	} else if oldAsset == nil {
 		return false, nil
 	}
 
 	if asset.Password == "***" {
-		asset.Password = p.Password
+		asset.Password = oldAsset.Password
 	}
 
 	affected, err := adapter.engine.ID(core.PK{owner, name}).AllCols().Update(asset)
+	if err != nil {
+		return false, err
+	}
+
+	err = AssetHook(asset, oldAsset, "update")
 	if err != nil {
 		return false, err
 	}
@@ -166,7 +187,15 @@ func UpdateAsset(id string, asset *Asset) (bool, error) {
 }
 
 func AddAsset(asset *Asset) (bool, error) {
+	if asset.Id == "" {
+		asset.Id = util.GenerateId()
+	}
 	affected, err := adapter.engine.Insert(asset)
+	if err != nil {
+		return false, err
+	}
+
+	err = AssetHook(asset, nil, "insert")
 	if err != nil {
 		return false, err
 	}
@@ -176,6 +205,11 @@ func AddAsset(asset *Asset) (bool, error) {
 
 func DeleteAsset(asset *Asset) (bool, error) {
 	affected, err := adapter.engine.ID(core.PK{asset.Owner, asset.Name}).Delete(&Asset{})
+	if err != nil {
+		return false, err
+	}
+
+	err = AssetHook(asset, nil, "delete")
 	if err != nil {
 		return false, err
 	}
@@ -196,4 +230,64 @@ func GetAssetsByName(owner, name string, isAdmin bool) ([]*Asset, error) {
 	// TODO get asset by call enforcer API
 
 	return assets, nil
+}
+
+func (asset *Asset) toConnection() *dbgate.Connection {
+	connection := &dbgate.Connection{
+		Id:              asset.Id,
+		Engine:          asset.Type,
+		Server:          asset.Endpoint,
+		User:            asset.Username,
+		Password:        asset.Password,
+		Port:            asset.Port,
+		DatabaseUrl:     asset.DatabaseUrl,
+		UseDatabaseUrl:  asset.UseDatabaseUrl,
+		DatabaseFile:    asset.DatabaseFile,
+		SocketPath:      asset.SocketPath,
+		AuthType:        asset.AuthType,
+		DefaultDatabase: asset.DefaultDatabase,
+		DisplayName:     asset.DisplayName,
+		IsReadOnly:      asset.IsReadOnly,
+	}
+	return connection.TransferToSave()
+}
+
+func AssetHook(asset *Asset, oldAsset *Asset, action string) error {
+	if oldAsset != nil {
+		if oldAsset.Category == "Database" && asset.Category != "Database" {
+			err := dataStore.Remove(asset.Id)
+			if err != nil {
+				return err
+			}
+		}
+		if oldAsset.Category != "Database" && asset.Category == "Database" {
+			err := dataStore.Insert(asset.toConnection())
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	if asset.Category != "Database" {
+		return nil
+	}
+
+	switch action {
+	case "insert":
+		err := dataStore.Insert(asset.toConnection())
+		if err != nil {
+			return err
+		}
+	case "update":
+		err := dataStore.Update(asset.toConnection())
+		if err != nil {
+			return err
+		}
+	case "delete":
+		err := dataStore.Remove(asset.Id)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

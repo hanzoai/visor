@@ -63,7 +63,7 @@ const AssetTree = ({onSelect, account}) => {
     };
 
     data.forEach((asset) => {
-      const {os, tag} = asset;
+      const {name, owner, os, tag, category} = asset;
 
       if (tag) {
         if (!categorizedAssets[tag]) {
@@ -71,8 +71,8 @@ const AssetTree = ({onSelect, account}) => {
         }
 
         categorizedAssets[tag].push({
-          title: asset.name,
-          key: asset.owner + "/" + asset.name,
+          title: name,
+          key: owner + "/" + name + "/" + category,
         });
       } else if (os) {
         if (!categorizedAssets[os]) {
@@ -80,13 +80,13 @@ const AssetTree = ({onSelect, account}) => {
         }
 
         categorizedAssets[os].push({
-          title: asset.name,
-          key: asset.owner + "/" + asset.name,
+          title: name,
+          key: owner + "/" + name + "/" + category,
         });
       } else {
         categorizedAssets.default.push({
-          title: asset.name,
-          key: asset.owner + "/" + asset.name,
+          title: name,
+          key: owner + "/" + name + "/" + category,
         });
       }
     });

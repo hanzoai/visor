@@ -16,6 +16,7 @@ import React, {useEffect, useState} from "react";
 import {Tabs} from "antd";
 import GuacdPage from "./GuacdPage";
 import i18next from "i18next";
+import DatabasesPage from "../../DatabasesPage";
 
 const RemoteDesktop = (props) => {
   const [activeKey, setActiveKey] = useState("");
@@ -50,19 +51,35 @@ const RemoteDesktop = (props) => {
       }
     }
 
-    const newPane = {
-      label: asset.name,
-      children: <GuacdPage
-        assetId={`${asset.owner}/${asset.name}`}
-        activeKey={activeKey}
-        closePane={removePane}
-        toggleFullscreen={props.toggleFullscreen}
-        addClient={(client) => {
-          setClients(clients => new Map(clients.set(activeKey, client)));
-        }}
-      />,
-      key: activeKey,
+    const newMachinePane = () => {
+      return {
+        label: asset.name,
+        children: <GuacdPage
+          assetId={`${asset.owner}/${asset.name}`}
+          activeKey={activeKey}
+          closePane={removePane}
+          toggleFullscreen={props.toggleFullscreen}
+          addClient={(client) => {
+            setClients(clients => new Map(clients.set(activeKey, client)));
+          }}
+        />,
+        key: activeKey,
+      };
     };
+
+    const newDatabasePane = () => {
+      return {
+        label: asset.name,
+        children: <DatabasesPage
+          assetId={`${asset.owner}/${asset.name}`}
+          activeKey={activeKey}
+          closePane={removePane}
+        />,
+        key: activeKey,
+      };
+    };
+
+    const newPane = asset.category === "Machine" ? newMachinePane() : newDatabasePane();
 
     setPanes(panes => [...panes, newPane]);
     setActiveKey(activeKey);
