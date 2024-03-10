@@ -32,4 +32,4 @@ export const ThemeDefault = {
   isCompact: false,
 };
 
-export const dbgateUrl = "http://localhost:5001";
+export const dbgateEndpoint = "http://localhost:3000";

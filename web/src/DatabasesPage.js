@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import React from "react";
-import {dbgateUrl} from "./Conf";
+import {dbgateEndpoint} from "./Conf";
 const DatabasesPage = (props) => {
   const {activeKey} = props;
 
@@ -27,7 +27,7 @@ const DatabasesPage = (props) => {
 
   return (
     <div >
-      <iframe src={dbgateUrl} style={{width: "100%", height: getHeight()}} />;
+      <iframe src={dbgateEndpoint} style={{width: "100%", height: getHeight()}} />;
     </div>
   );
 };

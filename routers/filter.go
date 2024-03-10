@@ -35,6 +35,8 @@ var (
 	newCasdoorOrganization = conf.GetConfigString("casdoorOrganization")
 	oldCasdoorApplication  = "app-casvisor"
 	newCasdoorApplication  = conf.GetConfigString("casdoorApplication")
+	oldDbgateEndpoint      = "http://localhost:3000"
+	newDbgateEndpoint      = conf.GetConfigString("dbgateEndpoint")
 )
 
 func TransparentStatic(ctx *context.Context) {
@@ -81,6 +83,9 @@ func serveFileWithReplace(w http.ResponseWriter, r *http.Request, name string) {
 	}
 	if oldCasdoorApplication != newCasdoorApplication {
 		content = strings.ReplaceAll(content, fmt.Sprintf("\"%s\"", oldCasdoorApplication), fmt.Sprintf("\"%s\"", newCasdoorApplication))
+	}
+	if oldDbgateEndpoint != newDbgateEndpoint {
+		content = strings.ReplaceAll(content, fmt.Sprintf("\"%s\"", oldDbgateEndpoint), fmt.Sprintf("\"%s\"", newDbgateEndpoint))
 	}
 
 	http.ServeContent(w, r, d.Name(), d.ModTime(), strings.NewReader(content))

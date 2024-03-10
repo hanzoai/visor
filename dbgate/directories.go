@@ -2,17 +2,18 @@ package dbgate
 
 import (
 	"os"
+	"path/filepath"
 
 	"github.com/beego/beego/logs"
+	"github.com/casbin/casvisor/conf"
 )
 
-const (
-	dbgateDir = "../dbgate/packages/api/data"
-)
+var dbgateDir = conf.GetConfigString("dbgateDir")
 
 func dataDir() string {
-	ensureDirectory(dbgateDir)
-	return dbgateDir
+	dbgateWorkspaceDir := filepath.Join(dbgateDir, ".dbgate")
+	ensureDirectory(dbgateWorkspaceDir)
+	return dbgateWorkspaceDir
 }
 
 func ensureDirectory(dir string) {
