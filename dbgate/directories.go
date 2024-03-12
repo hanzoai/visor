@@ -8,7 +8,16 @@ import (
 	"github.com/casbin/casvisor/conf"
 )
 
-var dbgateDir = conf.GetConfigString("dbgateDir")
+var dbgateDir string
+
+func init() {
+	_, err := os.Stat("./dbgate-docker")
+	if err == nil {
+		dbgateDir = "./dbgate-docker"
+	} else {
+		dbgateDir = conf.GetConfigString("dbgateDir")
+	}
+}
 
 func dataDir() string {
 	dbgateWorkspaceDir := filepath.Join(dbgateDir, ".dbgate")
@@ -18,9 +27,9 @@ func dataDir() string {
 
 func ensureDirectory(dir string) {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		err := os.Mkdir(dir, os.ModePerm)
+		err := os.Mkdir(dir, 0o755)
 		if err != nil {
-			logs.Error("Failed to create directory:%s", dir)
+			logs.Error("Failed to create directory:%s %v", dir, err)
 		}
 	}
 }
