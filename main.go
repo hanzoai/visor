@@ -39,12 +39,11 @@ func main() {
 		AllowCredentials: true,
 	}))
 
-	// beego.DelStaticPath("/static")
-	// beego.SetStaticPath("/static", "web/build/static")
 	// https://studygolang.com/articles/2303
 	beego.InsertFilter("/", beego.BeforeRouter, routers.TransparentStatic) // must has this for default page
 	beego.InsertFilter("/*", beego.BeforeRouter, routers.TransparentStatic)
-	beego.InsertFilter("*", beego.BeforeRouter, routers.ApiFilter)
+	beego.InsertFilter("/dbgate/*", beego.BeforeRouter, routers.ProxyFilter)
+	beego.InsertFilter("/api/*", beego.BeforeRouter, routers.ApiFilter)
 
 	if beego.AppConfig.String("redisEndpoint") == "" {
 		beego.BConfig.WebConfig.Session.SessionProvider = "file"

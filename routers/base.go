@@ -54,6 +54,20 @@ func requestDeny(ctx *context.Context) {
 	}
 }
 
+func responseError(ctx *context.Context, msg string) {
+	ctx.ResponseWriter.WriteHeader(http.StatusInternalServerError)
+
+	response := &Response{
+		Status: "error",
+		Msg:    msg,
+	}
+
+	err := ctx.Output.JSON(response, false, false)
+	if err != nil {
+		return
+	}
+}
+
 func getUsernameByClientIdSecret(ctx *context.Context) (string, error) {
 	clientId, clientSecret, ok := ctx.Request.BasicAuth()
 	if !ok {

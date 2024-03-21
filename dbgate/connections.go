@@ -29,7 +29,7 @@ type Connection struct {
 	User            string `json:"user,omitempty"`
 	Password        string `json:"password,omitempty"`
 	PasswordMode    string `json:"passwordMode,omitempty"`
-	Port            int    `json:"port,omitempty"`
+	Port            string `json:"port,omitempty"`
 	DatabaseUrl     string `json:"databaseUrl,omitempty"`
 	UseDatabaseUrl  bool   `json:"useDatabaseUrl,omitempty"`
 	DatabaseFile    string `json:"databaseFile,omitempty"`

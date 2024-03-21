@@ -24,6 +24,8 @@ import (
 func FileExist(path string) bool {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return false
+	} else if err != nil {
+		return false
 	}
 	return true
 }

@@ -16,6 +16,7 @@ package object
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/casbin/casvisor/dbgate"
 	"github.com/casbin/casvisor/util"
@@ -239,7 +240,7 @@ func (asset *Asset) toConnection() *dbgate.Connection {
 		Server:          asset.Endpoint,
 		User:            asset.Username,
 		Password:        asset.Password,
-		Port:            asset.Port,
+		Port:            strconv.Itoa(asset.Port),
 		DatabaseUrl:     asset.DatabaseUrl,
 		UseDatabaseUrl:  asset.UseDatabaseUrl,
 		DatabaseFile:    asset.DatabaseFile,
