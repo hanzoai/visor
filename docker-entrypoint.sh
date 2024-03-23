@@ -15,5 +15,5 @@ then
   echo "$HOST_IP $HOST_DOMAIN" >> /etc/hosts
 fi
 
-node /home/casvisor/dbgate-docker/bundle.js --listen-api &
+node /home/dbgate-docker/bundle.js --listen-api &
 exec /home/casvisor/server --createDatabase=true

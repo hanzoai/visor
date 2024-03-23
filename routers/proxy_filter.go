@@ -21,37 +21,21 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/beego/beego/context"
 	"github.com/casvisor/casvisor/conf"
-	"github.com/casvisor/casvisor/util"
 )
 
-var staticDir string
-
-func init() {
-	_, err := os.Stat("./dbgate-docker")
-	if err == nil {
-		staticDir = filepath.Join("./dbgate-docker", "public/")
-	} else {
-		staticDir = filepath.Join(conf.GetConfigString("dbgateDir"), "packages/web/public/")
-	}
-}
-
 func ProxyFilter(ctx *context.Context) {
-	requestPath := ctx.Request.RequestURI
-	dbgateEndpoint := conf.GetConfigString("dbgateEndpoint")
-
-	requestPath = strings.TrimPrefix(requestPath, "/dbgate")
-	filePath := filepath.Join(staticDir, requestPath)
-
-	if util.FileExist(filePath) {
-		http.ServeFile(ctx.ResponseWriter, ctx.Request, filePath)
+	user := GetSessionUser(ctx)
+	if user == nil {
+		requestDeny(ctx)
 		return
 	}
+
+	requestPath := ctx.Request.RequestURI
+	dbgateEndpoint := conf.GetConfigString("dbgateEndpoint")
 
 	targetURL, err := url.Parse(dbgateEndpoint + requestPath)
 	if err != nil {

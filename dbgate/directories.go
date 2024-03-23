@@ -11,9 +11,12 @@ import (
 var dbgateDir string
 
 func init() {
-	_, err := os.Stat("./dbgate-docker")
+	_, err := os.Stat("/home/dbgate-docker")
 	if err == nil {
-		dbgateDir = "./dbgate-docker"
+		dbgateDir, err = os.UserHomeDir()
+		if err != nil {
+			panic("Failed to get user home directory")
+		}
 	} else {
 		dbgateDir = conf.GetConfigString("dbgateDir")
 	}

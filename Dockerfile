@@ -30,7 +30,7 @@ COPY --from=BACK --chown=$USER:$USER /go/src/casvisor/data ./data
 COPY --from=BACK --chown=$USER:$USER /go/src/casvisor/entrypoint.sh ./entrypoint.sh
 COPY --from=BACK --chown=$USER:$USER /go/src/casvisor/conf/app.conf ./conf/app.conf
 COPY --from=FRONT --chown=$USER:$USER /web/build ./web/build
-COPY --from=dbgate --chown=$USER:$USER /home/dbgate-docker ./dbgate-docker
+COPY --from=dbgate --chown=$USER:$USER /home/dbgate-docker /home/dbgate-docker
 
 RUN chmod +x ./entrypoint.sh
 
@@ -38,12 +38,11 @@ RUN adduser -D $USER -u 1000 \
     && echo "$USER ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/$USER \
     && chmod 0440 /etc/sudoers.d/$USER \
     && mkdir logs \
-    && chown -R $USER:$USER /home/casvisor/dbgate-docker \
+    && chown -R $USER:$USER /home/dbgate-docker \
     && chown -R $USER:$USER /home/casvisor/logs
 
 USER $USER
 
-EXPOSE 3000
 EXPOSE 19000
 
 ENTRYPOINT ["/bin/sh"]
@@ -70,10 +69,9 @@ COPY --from=BACK /go/src/casvisor/data ./data
 COPY --from=BACK /go/src/casvisor/docker-entrypoint.sh ./docker-entrypoint.sh
 COPY --from=BACK /go/src/casvisor/conf/app.conf ./conf/app.conf
 COPY --from=FRONT /web/build ./web/build
-COPY --from=dbgate /home/dbgate-docker ./dbgate-docker
+COPY --from=dbgate /home/dbgate-docker /home/dbgate-docker
 
 EXPOSE 19000
-EXPOSE 3000
 
 ENTRYPOINT ["/bin/bash"]
 CMD ["/home/casvisor/docker-entrypoint.sh"]
