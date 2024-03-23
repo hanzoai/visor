@@ -26,8 +26,8 @@ import (
 	"strings"
 
 	"github.com/beego/beego/context"
-	"github.com/casbin/casvisor/conf"
-	"github.com/casbin/casvisor/util"
+	"github.com/casvisor/casvisor/conf"
+	"github.com/casvisor/casvisor/util"
 )
 
 var staticDir string

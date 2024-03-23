@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 
 	"github.com/beego/beego/logs"
-	"github.com/casbin/casvisor/conf"
+	"github.com/casvisor/casvisor/conf"
 )
 
 var dbgateDir string

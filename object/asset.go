@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/casbin/casvisor/dbgate"
-	"github.com/casbin/casvisor/util"
+	"github.com/casvisor/casvisor/dbgate"
+	"github.com/casvisor/casvisor/util"
 	"xorm.io/core"
 )
 
