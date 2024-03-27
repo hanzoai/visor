@@ -12,11 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import React from "react";
+import React, {useEffect, useState} from "react";
 import * as Setting from "./Setting";
+import i18next from "i18next";
+import {Button, Result} from "antd";
+import * as AssetBackend from "./backend/AssetBackend";
 
 const DatabasesPage = (props) => {
   const {activeKey} = props;
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    AssetBackend.checkDbgate().then((res) => {
+      if (res.status === "error") {
+        setError(res.msg);
+      }
+    });
+  }, []);
 
   const getHeight = () => {
     if (activeKey) {
@@ -26,9 +38,18 @@ const DatabasesPage = (props) => {
     }
   };
 
+  if (error) {
+    return <Result
+      status="500"
+      title="500"
+      subTitle={<p>{error}</p>}
+      extra={<a href="/assets"><Button type="primary">{i18next.t("general:Back")}</Button></a>}
+    />;
+  }
+
   return (
-    <div >
-      <iframe src={`${Setting.ServerUrl}/dbgate`} style={{width: "100%", height: getHeight()}} />;
+    <div>
+      <iframe src={`${Setting.ServerUrl}/dbgate`} style={{width: "100%", height: getHeight()}} />
     </div>
   );
 };

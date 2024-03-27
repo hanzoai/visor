@@ -22,6 +22,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"path/filepath"
+	"strings"
 
 	"github.com/beego/beego/context"
 	"github.com/casvisor/casvisor/conf"
@@ -85,6 +86,17 @@ func ProxyFilter(ctx *context.Context) {
 		if contentType != "" {
 			r.Header.Set("Content-Type", contentType)
 		}
+	}
+
+	// ErrorHandler is called when the proxy encounters an error.
+	proxy.ErrorHandler = func(rw http.ResponseWriter, req *http.Request, err error) {
+		print(err.Error())
+		if strings.Contains(err.Error(), "No connection could be made because the target machine actively refused it") {
+			responseError(ctx, "dbgate service is not available")
+			return
+		}
+
+		responseError(ctx, err.Error())
 	}
 
 	proxy.ServeHTTP(ctx.ResponseWriter, ctx.Request)

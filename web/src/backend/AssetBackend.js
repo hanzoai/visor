@@ -54,3 +54,10 @@ export function deleteAsset(asset) {
     body: JSON.stringify(newAsset),
   }).then(res => res.json());
 }
+
+export function checkDbgate() {
+  return fetch(`${Setting.ServerUrl}/dbgate`, {
+    method: "GET",
+    credentials: "include",
+  }).then(res => res.json());
+}

@@ -30,7 +30,7 @@ func dataDir() string {
 
 func ensureDirectory(dir string) {
 	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		err := os.Mkdir(dir, 0o755)
+		err := os.MkdirAll(dir, 0o755)
 		if err != nil {
 			logs.Error("Failed to create directory:%s %v", dir, err)
 		}
