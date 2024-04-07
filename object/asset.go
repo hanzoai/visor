@@ -23,10 +23,14 @@ import (
 	"xorm.io/core"
 )
 
-var dataStore *dbgate.JsonLinesDatabase
+var (
+	dataStore         *dbgate.JsonLinesDatabase
+	RestartClientChan chan string
+)
 
 func init() {
 	dataStore = dbgate.NewConnectionDataStore()
+	RestartClientChan = make(chan string)
 }
 
 type Service struct {
@@ -70,6 +74,7 @@ type Asset struct {
 	EnableRemoteApp bool         `json:"enableRemoteApp"`
 	RemoteApps      []*RemoteApp `json:"remoteApps"`
 	Services        []*Service   `json:"services"`
+	GatewayPort     int          `json:"gatewayPort"`
 
 	Id              string `xorm:"varchar(100)" json:"id"`
 	DatabaseUrl     string `xorm:"varchar(200)" json:"databaseUrl"`
@@ -218,7 +223,7 @@ func DeleteAsset(asset *Asset) (bool, error) {
 	return affected != 0, nil
 }
 
-func (asset *Asset) getId() string {
+func (asset *Asset) GetId() string {
 	return fmt.Sprintf("%s/%s", asset.Owner, asset.Name)
 }
 
@@ -254,6 +259,12 @@ func (asset *Asset) toConnection() *dbgate.Connection {
 }
 
 func AssetHook(asset *Asset, oldAsset *Asset, action string) error {
+	if action == "update" && asset.Category == "Machine" {
+		if asset.GatewayPort != oldAsset.GatewayPort {
+			RestartClientChan <- asset.Name
+		}
+	}
+
 	if oldAsset != nil {
 		if oldAsset.Category == "Database" && asset.Category != "Database" {
 			err := dataStore.Remove(asset.Id)

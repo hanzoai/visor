@@ -20,6 +20,7 @@ import (
 
 	"github.com/beego/beego"
 	"github.com/beego/beego/logs"
+	"github.com/casvisor/casvisor/conf"
 	"github.com/casvisor/casvisor/object"
 	"github.com/casvisor/casvisor/util"
 	"github.com/casvisor/casvisor/util/guacamole"
@@ -275,8 +276,18 @@ func setConfig(propertyMap map[string]string, asset *object.Asset, configuration
 		configuration.Protocol = "vnc"
 	}
 
-	configuration.SetParameter("hostname", asset.Endpoint)
-	configuration.SetParameter("port", strconv.Itoa(asset.Port))
+	if asset.GatewayPort != 0 {
+		if conf.GatewayAddr != nil {
+			configuration.SetParameter("hostname", conf.GatewayAddr.IP.String())
+		} else {
+			configuration.SetParameter("hostname", "localhost")
+		}
+		configuration.SetParameter("port", strconv.Itoa(asset.GatewayPort))
+	} else {
+		configuration.SetParameter("hostname", asset.Endpoint)
+		configuration.SetParameter("port", strconv.Itoa(asset.Port))
+	}
+
 	configuration.SetParameter("username", asset.Username)
 	configuration.SetParameter("password", asset.Password)
 

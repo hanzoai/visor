@@ -15,12 +15,27 @@
 package conf
 
 import (
+	"net"
 	"os"
 	"runtime"
 	"strings"
 
 	"github.com/beego/beego"
+	"github.com/casvisor/casvisor/util"
 )
+
+var GatewayAddr *net.TCPAddr
+
+func init() {
+	var err error
+	gatewayEndpoint := GetConfigString("gatewayEndpoint")
+	if gatewayEndpoint != "" {
+		GatewayAddr, err = net.ResolveTCPAddr("tcp", gatewayEndpoint)
+		if err != nil {
+			panic("failed to resolve gateway address %s")
+		}
+	}
+}
 
 func GetConfigString(key string) string {
 	if value, ok := os.LookupEnv(key); ok {
@@ -33,6 +48,8 @@ func GetConfigString(key string) string {
 			res = "https://cdn.casbin.org"
 		} else if key == "logConfig" {
 			res = "{\"filename\": \"logs/casdoor.log\", \"maxdays\":99999, \"perm\":\"0770\"}"
+		} else if key == "dbName" {
+			res = "casvisor"
 		}
 	}
 
@@ -46,6 +63,11 @@ func GetConfigBool(key string) bool {
 	} else {
 		return false
 	}
+}
+
+func GetConfigInt(key string) int {
+	value := GetConfigString(key)
+	return util.ParseInt(value)
 }
 
 func GetConfigDataSourceName() string {

@@ -20,6 +20,7 @@ import (
 	_ "github.com/beego/beego/session/redis"
 	"github.com/casvisor/casvisor/authz"
 	"github.com/casvisor/casvisor/object"
+	"github.com/casvisor/casvisor/proxy"
 	"github.com/casvisor/casvisor/routers"
 	"github.com/casvisor/casvisor/task"
 	"github.com/casvisor/casvisor/util"
@@ -55,6 +56,8 @@ func main() {
 	beego.BConfig.WebConfig.Session.SessionGCMaxLifetime = 3600 * 24 * 365
 
 	task.NewTicker().SetupTicker()
+
+	go proxy.NewStarter(object.RestartClientChan).Start()
 
 	beego.Run()
 }

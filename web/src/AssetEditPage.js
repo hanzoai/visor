@@ -110,7 +110,7 @@ class AssetEditPage extends React.Component {
   }
 
   parseAssetField(key, value) {
-    if (["port"].includes(key)) {
+    if (["port", "gatewayPort"].includes(key)) {
       value = Setting.myParseInt(value);
     }
     return value;
@@ -153,24 +153,24 @@ class AssetEditPage extends React.Component {
     }
   }
 
-  omitSetting(assset) {
-    if (assset.category === "Machine") {
-      assset.authType = "";
-      assset.defaultDatabase = "";
-      assset.databaseUrl = "";
-      assset.useDatabaseUrl = false;
-    } else if (assset.category === "Database") {
-      assset.autoQuery = false;
-      assset.isPermanent = false;
-      assset.remoteApps = [];
-      assset.services = [];
-      assset.enableRemoteApp = false;
+  omitSetting(asset) {
+    if (asset.category === "Machine") {
+      asset.authType = "";
+      asset.defaultDatabase = "";
+      asset.databaseUrl = "";
+      asset.useDatabaseUrl = false;
+    } else if (asset.category === "Database") {
+      asset.autoQuery = false;
+      asset.isPermanent = false;
+      asset.remoteApps = [];
+      asset.services = [];
+      asset.enableRemoteApp = false;
     }
-    return assset;
+    return asset;
   }
 
   renderAsset() {
-    const asset = this.state.asset;
+    const {asset} = this.state;
 
     return (
       <Card size="small" title={
@@ -262,6 +262,16 @@ class AssetEditPage extends React.Component {
             </Col>
           </Row>
         }
+        <Row style={{marginTop: "20px"}} >
+          <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+            {Setting.getLabel(i18next.t("asset:Gatewat port"), i18next.t("asset:Gatewat port - Tooltip"))} :
+          </Col>
+          <Col span={22} >
+            <Input value={asset.gatewayPort} onChange={e => {
+              this.updateAssetField("gatewayPort", e.target.value);
+            }} />
+          </Col>
+        </Row>
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
             {Setting.getLabel(i18next.t("general:Endpoint"), i18next.t("general:Endpoint - Tooltip"))} :

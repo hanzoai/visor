@@ -11,6 +11,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.1
 	github.com/qiangmzsx/string-adapter/v2 v2.2.0
+	github.com/sheerun/queue v1.0.1
 	github.com/ua-parser/uap-go v0.0.0-20240113215029-33f8e6d47f38
 	xorm.io/core v0.7.3
 	xorm.io/xorm v1.3.8
@@ -41,14 +42,14 @@ require (
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/xorm-io/builder v0.3.13 // indirect
 	github.com/xorm-io/xorm v1.1.6 // indirect
-	golang.org/x/crypto v0.19.0 // indirect
+	golang.org/x/crypto v0.21.0 // indirect
 	golang.org/x/net v0.21.0 // indirect
 	golang.org/x/oauth2 v0.16.0 // indirect
-	golang.org/x/sys v0.17.0 // indirect
+	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/tools v0.9.1 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/protobuf v1.32.0 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	modernc.org/memory v1.5.0 // indirect
 	modernc.org/token v1.1.0 // indirect
