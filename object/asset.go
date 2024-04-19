@@ -93,7 +93,7 @@ func GetAssetCount(owner, field, value string) (int64, error) {
 
 func GetAssets(owner string) ([]*Asset, error) {
 	assets := []*Asset{}
-	err := adapter.engine.Desc("created_time").Find(&assets, &Asset{Owner: owner})
+	err := adapter.Engine.Desc("created_time").Find(&assets, &Asset{Owner: owner})
 	if err != nil {
 		return assets, err
 	}
@@ -118,7 +118,7 @@ func getAsset(owner string, name string) (*Asset, error) {
 	}
 
 	asset := Asset{Owner: owner, Name: name}
-	existed, err := adapter.engine.Get(&asset)
+	existed, err := adapter.Engine.Get(&asset)
 	if err != nil {
 		return &asset, err
 	}
@@ -175,11 +175,18 @@ func UpdateAsset(id string, asset *Asset) (bool, error) {
 		return false, nil
 	}
 
+	if name != asset.Name {
+		err = assetChangeTrigger(name, asset.Name)
+		if err != nil {
+			return false, err
+		}
+	}
+
 	if asset.Password == "***" {
 		asset.Password = oldAsset.Password
 	}
 
-	affected, err := adapter.engine.ID(core.PK{owner, name}).AllCols().Update(asset)
+	affected, err := adapter.Engine.ID(core.PK{owner, name}).AllCols().Update(asset)
 	if err != nil {
 		return false, err
 	}
@@ -196,7 +203,7 @@ func AddAsset(asset *Asset) (bool, error) {
 	if asset.Id == "" {
 		asset.Id = util.GenerateId()
 	}
-	affected, err := adapter.engine.Insert(asset)
+	affected, err := adapter.Engine.Insert(asset)
 	if err != nil {
 		return false, err
 	}
@@ -210,7 +217,7 @@ func AddAsset(asset *Asset) (bool, error) {
 }
 
 func DeleteAsset(asset *Asset) (bool, error) {
-	affected, err := adapter.engine.ID(core.PK{asset.Owner, asset.Name}).Delete(&Asset{})
+	affected, err := adapter.Engine.ID(core.PK{asset.Owner, asset.Name}).Delete(&Asset{})
 	if err != nil {
 		return false, err
 	}
@@ -302,4 +309,33 @@ func AssetHook(asset *Asset, oldAsset *Asset, action string) error {
 		}
 	}
 	return nil
+}
+
+func assetChangeTrigger(oldName string, newName string) error {
+	session := adapter.Engine.NewSession()
+	defer session.Close()
+
+	err := session.Begin()
+	if err != nil {
+		return err
+	}
+
+	var commands []*Command
+	err = adapter.Engine.Find(&commands)
+	if err != nil {
+		return err
+	}
+	for i, command := range commands {
+		for j, asset := range command.Assets {
+			if asset == oldName {
+				commands[i].Assets[j] = newName
+			}
+		}
+		_, err = session.ID(core.PK{command.Owner, command.Name}).Update(commands[i])
+		if err != nil {
+			return err
+		}
+	}
+
+	return session.Commit()
 }

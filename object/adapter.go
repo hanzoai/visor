@@ -44,12 +44,12 @@ func InitAdapter() {
 type Adapter struct {
 	driverName     string
 	dataSourceName string
-	engine         *xorm.Engine
+	Engine         *xorm.Engine
 }
 
 // finalizer is the destructor for Adapter.
 func finalizer(a *Adapter) {
-	err := a.engine.Close()
+	err := a.Engine.Close()
 	if err != nil {
 		panic(err)
 	}
@@ -91,34 +91,39 @@ func (a *Adapter) open() {
 		panic(err)
 	}
 
-	a.engine = engine
+	a.Engine = engine
 	a.createTable()
 }
 
 func (a *Adapter) close() {
-	a.engine.Close()
-	a.engine = nil
+	a.Engine.Close()
+	a.Engine = nil
 }
 
 func (a *Adapter) createTable() {
-	err := a.engine.Sync2(new(Record))
+	err := a.Engine.Sync2(new(Record))
 	if err != nil {
 		panic(err)
 	}
 
-	err = a.engine.Sync2(new(Asset))
+	err = a.Engine.Sync2(new(Asset))
 	if err != nil {
 		panic(err)
 	}
 
-	err = a.engine.Sync2(new(Session))
+	err = a.Engine.Sync2(new(Session))
+	if err != nil {
+		panic(err)
+	}
+
+	err = a.Engine.Sync2(new(Command))
 	if err != nil {
 		panic(err)
 	}
 }
 
 func GetSession(owner string, offset, limit int, field, value, sortField, sortOrder string) *xorm.Session {
-	session := adapter.engine.Prepare()
+	session := adapter.Engine.Prepare()
 	if offset != -1 && limit != -1 {
 		session.Limit(limit, offset)
 	}

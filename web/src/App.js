@@ -35,6 +35,8 @@ import ShortcutsPage from "./basic/ShortcutsPage";
 import AssetWorkbench from "./AssetWorkbench";
 import AccessPage from "./component/access/AccessPage";
 import DatabasesPage from "./DatabasesPage";
+import CommandListPage from "./CommandListPage";
+import CommandEditPage from "./CommandEditPage";
 
 const {Header, Footer, Content} = Layout;
 
@@ -201,6 +203,7 @@ class App extends Component {
 
     res.push(Setting.getItem(<Link to="/">{i18next.t("general:Home")}</Link>, ""));
     res.push(Setting.getItem(<Link to="/assets">{i18next.t("general:Assets")}</Link>, "assets"));
+    res.push(Setting.getItem(<Link to="/commands">{i18next.t("general:Commands")}</Link>, "commands"));
     res.push(Setting.getItem(<Link to="/sessions">{i18next.t("general:Sessions")}</Link>, "sessions"));
     res.push(Setting.getItem(<Link to="/records">{i18next.t("general:Records")}</Link>, "records"));
     res.push(Setting.getItem(<Link to="/workbench" target="_blank">{i18next.t("general:Workbench")}</Link>, "workbench"));
@@ -240,6 +243,8 @@ class App extends Component {
         <Route exact path="/records" render={(props) => this.renderSigninIfNotSignedIn(<RecordListPage account={this.state.account} {...props} />)} />
         <Route exact path="/records/:organizationName/:recordName" render={(props) => this.renderSigninIfNotSignedIn(<RecordEditPage account={this.state.account} {...props} />)} />
         <Route exact path="/access/:owner/:name" render={(props) => this.renderSigninIfNotSignedIn(<AccessPage account={this.state.account} {...props} />)} />
+        <Route exact path="/commands" render={(props) => this.renderSigninIfNotSignedIn(<CommandListPage account={this.state.account} {...props} />)} />
+        <Route exact path="/commands/:organizationName/:commandName" render={(props) => this.renderSigninIfNotSignedIn(<CommandEditPage account={this.state.account} {...props} />)} />
         <Route exact path="/workbench" render={(props) => this.renderSigninIfNotSignedIn(<AssetWorkbench account={this.state.account} {...props} />)} />
       </Switch>
     );

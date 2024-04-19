@@ -13,6 +13,8 @@ require (
 	github.com/qiangmzsx/string-adapter/v2 v2.2.0
 	github.com/sheerun/queue v1.0.1
 	github.com/ua-parser/uap-go v0.0.0-20240113215029-33f8e6d47f38
+	github.com/yahoo/vssh v0.0.0-20201122023451-bfa903e660fc
+	golang.org/x/crypto v0.21.0
 	xorm.io/core v0.7.3
 	xorm.io/xorm v1.3.8
 )
@@ -42,7 +44,6 @@ require (
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/xorm-io/builder v0.3.13 // indirect
 	github.com/xorm-io/xorm v1.1.6 // indirect
-	golang.org/x/crypto v0.21.0 // indirect
 	golang.org/x/net v0.21.0 // indirect
 	golang.org/x/oauth2 v0.16.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect

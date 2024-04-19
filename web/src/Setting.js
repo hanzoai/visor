@@ -334,3 +334,22 @@ export function getDatabaseTypes() {
 export function getMachineTypes() {
   return ["RDP", "VNC", "SSH", "Telnet"];
 }
+
+export function getArrayItem(array, key, value) {
+  const res = array.filter(item => item[key] === value)[0];
+  return res;
+}
+
+export function getDeduplicatedArray(array, filterArray, key) {
+  const res = array.filter(item => !filterArray.some(tableItem => tableItem[key] === item[key]));
+  return res;
+}
+
+export function getNewRowNameForTable(table, rowName) {
+  const emptyCount = table.filter(row => row.name.includes(rowName)).length;
+  let res = rowName;
+  for (let i = 0; i < emptyCount; i++) {
+    res = res + " ";
+  }
+  return res;
+}

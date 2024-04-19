@@ -57,4 +57,12 @@ func initAPI() {
 
 	beego.Router("/api/add-asset-tunnel", &controllers.ApiController{}, "POST:AddAssetTunnel")
 	beego.Router("/api/get-asset-tunnel", &controllers.ApiController{}, "GET:GetAssetTunnel")
+
+	beego.Router("/api/get-commands", &controllers.ApiController{}, "GET:GetCommands")
+	beego.Router("/api/get-command", &controllers.ApiController{}, "GET:GetCommand")
+	beego.Router("/api/update-command", &controllers.ApiController{}, "POST:UpdateCommand")
+	beego.Router("/api/add-command", &controllers.ApiController{}, "POST:AddCommand")
+	beego.Router("/api/delete-command", &controllers.ApiController{}, "POST:DeleteCommand")
+	beego.Router("/api/exec-command", &controllers.ApiController{}, "GET:ExecCommand")
+	beego.Router("/api/get-exec-output", &controllers.ApiController{}, "GET:GetExecOutput")
 }

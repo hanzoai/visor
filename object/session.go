@@ -71,7 +71,7 @@ func GetSessionCount(owner, status, field, value string) (int64, error) {
 
 func GetSessions(owner string) ([]*Session, error) {
 	sessions := []*Session{}
-	err := adapter.engine.Desc("connected_time").Find(&sessions, &Session{Owner: owner})
+	err := adapter.Engine.Desc("connected_time").Find(&sessions, &Session{Owner: owner})
 	if err != nil {
 		return sessions, err
 	}
@@ -92,7 +92,7 @@ func GetPaginationSessions(owner, status string, offset, limit int, field, value
 
 func GetSessionsByStatus(statuses []string) ([]*Session, error) {
 	sessions := []*Session{}
-	err := adapter.engine.In("status", statuses).Find(&sessions)
+	err := adapter.Engine.In("status", statuses).Find(&sessions)
 	if err != nil {
 		return sessions, err
 	}
@@ -105,7 +105,7 @@ func getSession(owner string, name string) (*Session, error) {
 	}
 
 	session := Session{Owner: owner, Name: name}
-	existed, err := adapter.engine.Get(&session)
+	existed, err := adapter.Engine.Get(&session)
 	if err != nil {
 		return &session, err
 	}
@@ -131,12 +131,12 @@ func UpdateSession(id string, session *Session, columns ...string) (bool, error)
 	}
 
 	if len(columns) == 0 {
-		_, err := adapter.engine.ID(core.PK{owner, name}).AllCols().Update(session)
+		_, err := adapter.Engine.ID(core.PK{owner, name}).AllCols().Update(session)
 		if err != nil {
 			return false, err
 		}
 	} else {
-		_, err := adapter.engine.ID(core.PK{owner, name}).Cols(columns...).Update(session)
+		_, err := adapter.Engine.ID(core.PK{owner, name}).Cols(columns...).Update(session)
 		if err != nil {
 			return false, err
 		}
@@ -146,7 +146,7 @@ func UpdateSession(id string, session *Session, columns ...string) (bool, error)
 }
 
 func DeleteSession(session *Session) (bool, error) {
-	affected, err := adapter.engine.ID(core.PK{session.Owner, session.Name}).Delete(&Session{})
+	affected, err := adapter.Engine.ID(core.PK{session.Owner, session.Name}).Delete(&Session{})
 	if err != nil {
 		return false, err
 	}
@@ -160,7 +160,7 @@ func DeleteSessionById(id string) (bool, error) {
 }
 
 func AddSession(session *Session) (bool, error) {
-	affected, err := adapter.engine.Insert(session)
+	affected, err := adapter.Engine.Insert(session)
 	if err != nil {
 		return false, err
 	}
