@@ -18,7 +18,6 @@ import * as CommandBackend from "./backend/CommandBackend";
 import * as Setting from "./Setting";
 import i18next from "i18next";
 import * as AssetBackend from "./backend/AssetBackend";
-import TextArea from "antd/es/input/TextArea";
 
 class CommandEditPage extends React.Component {
   constructor(props) {
@@ -31,13 +30,28 @@ class CommandEditPage extends React.Component {
       owner: props.account.owner,
       commandName: props.match.params.commandName !== undefined ? props.match.params.commandName : "",
       mode: props.location.mode !== undefined ? props.location.mode : "edit",
-      result: [],
+      results: [],
     };
+    this.scrollState = {};
   }
 
   UNSAFE_componentWillMount() {
     this.getCommand();
     this.getAssets();
+  }
+
+  componentDidUpdate(prevProps, prevState) {
+    const scrollThreshold = 5;
+    this.state.results.forEach((result) => {
+      const textarea = document.getElementById(`textarea-${result.title}`);
+      if (textarea !== null) {
+        if (this.scrollState[result.title] !== undefined && Math.abs(textarea.scrollTop - this.scrollState[result.title]) > scrollThreshold) {
+          return;
+        }
+        textarea.scrollTop = textarea.scrollHeight;
+        this.scrollState[result.title] = textarea.scrollTop;
+      }
+    });
   }
 
   getCommand() {
@@ -46,7 +60,7 @@ class CommandEditPage extends React.Component {
         if (res.status === "ok") {
           this.setState({
             command: res.data,
-            result: res.data.assets.map(asset => {
+            results: res.data.assets.map(asset => {
               return {title: asset, text: ""};
             }),
           });
@@ -146,17 +160,17 @@ class CommandEditPage extends React.Component {
             <Select virtual={false} style={{width: "100%"}} mode="multiple" value={command.assets}
               options={this.state.assets.filter(asset => asset.type === "SSH").map(asset => Setting.getOption(asset.displayName, asset.name))}
               onChange={value => {
-                const result = [];
+                const results = [];
                 value.forEach((asset) => {
-                  if (this.state.result.find(item => item.title === asset) !== undefined) {
-                    result.push(this.state.result.find(item => item.title === asset));
+                  if (this.state.results.find(result => result.title === asset) !== undefined) {
+                    results.push(this.state.results.find(result => result.title === asset));
                   } else {
-                    result.push({title: asset, text: ""});
+                    results.push({title: asset, text: ""});
                   }
                 });
                 this.updateCommandField("assets", value);
                 this.setState({
-                  result: result,
+                  results: results,
                 });
               }}
             />
@@ -167,37 +181,37 @@ class CommandEditPage extends React.Component {
             {Setting.getLabel(i18next.t("command:Run"), i18next.t("command:Run - Tooltip"))} :
           </Col>
           <Col span={22} >
-            <Button onClick={() => {
+            <Button type="primary" style={{width: 180}} onClick={() => {
               command.assets.forEach((asset) => {
                 CommandBackend.execCommand(this.state.owner, this.state.commandName, asset, (data) => {
                   const jsonData = JSON.parse(data);
                   if (jsonData.text === "") {
                     jsonData.text = "\n";
                   }
-                  const result = this.state.result;
-                  if (this.state.result.find(item => item.title === asset) === undefined) {
-                    result.push({title: asset, text: jsonData.text});
+                  const results = this.state.results;
+                  if (this.state.results.find(result => result.title === asset) === undefined) {
+                    results.push({title: asset, text: jsonData.text});
                   } else {
-                    result.find(item => item.title === asset).text += jsonData.text + "\n";
+                    results.find(result => result.title === asset).text += jsonData.text + "\n";
                   }
                   this.setState({
-                    result: result,
+                    results: results,
                   });
                 }, (error) => {
-                  const result = this.state.result;
-                  if (this.state.result.find(item => item.title === asset) === undefined) {
-                    result.push({title: asset, text: error});
+                  const results = this.state.results;
+                  if (this.state.results.find(result => result.title === asset) === undefined) {
+                    results.push({title: asset, text: error});
                   } else {
-                    result.find(item => item.title === asset).text += error;
+                    results.find(result => result.title === asset).text += error;
                   }
                   this.setState({
-                    result: result,
+                    results: results,
                   });
                 });
               }
               );
             }}>
-              {i18next.t("command:Run")}
+              {i18next.t("command:Run All")}
             </Button>
           </Col>
         </Row>
@@ -211,11 +225,41 @@ class CommandEditPage extends React.Component {
                 gutter: 16,
                 column: 2,
               }}
-              dataSource={this.state.result}
-              renderItem={(item) => (
+              dataSource={this.state.results}
+              renderItem={(item, index) => (
                 <List.Item>
-                  <Card title={item.title}>
-                    <TextArea value={item.text} rows={8} readOnly />
+                  <Card title={item.title} size="small" extra={
+                    <Button type="primary" onClick={() => {
+                      CommandBackend.execCommand(this.state.owner, this.state.commandName, item.title, (data) => {
+                        const jsonData = JSON.parse(data);
+                        if (jsonData.text === "") {
+                          jsonData.text = "\n";
+                        }
+                        const results = this.state.results;
+                        if (this.state.results.find(result => result.title === item.title) === undefined) {
+                          results.push({title: item.title, text: jsonData.text});
+                        } else {
+                          results.find(result => result.title === item.title).text += jsonData.text + "\n";
+                        }
+                        this.setState({
+                          results: results,
+                        });
+                      }, (error) => {
+                        const results = this.state.results;
+                        if (this.state.results.find(result => result.title === item.title) === undefined) {
+                          results.push({title: item.title, text: error});
+                        } else {
+                          results.find(result => result.title === item.title).text += error;
+                        }
+                        this.setState({
+                          results: results,
+                        });
+                      });
+                    }}>
+                      {i18next.t("command:Run")}
+                    </Button>
+                  }>
+                    <Input.TextArea id={`textarea-${item.title}`} value={item.text} rows={8} readOnly />
                   </Card>
                 </List.Item>
               )}
