@@ -18,6 +18,10 @@ import * as CommandBackend from "./backend/CommandBackend";
 import * as Setting from "./Setting";
 import i18next from "i18next";
 import * as AssetBackend from "./backend/AssetBackend";
+import "xterm/css/xterm.css";
+import {Terminal} from "xterm";
+import {FitAddon} from "xterm-addon-fit";
+import {WebLinksAddon} from "xterm-addon-web-links";
 
 class CommandEditPage extends React.Component {
   constructor(props) {
@@ -30,28 +34,40 @@ class CommandEditPage extends React.Component {
       owner: props.account.owner,
       commandName: props.match.params.commandName !== undefined ? props.match.params.commandName : "",
       mode: props.location.mode !== undefined ? props.location.mode : "edit",
-      results: [],
+      terminals: new Map(),
     };
-    this.scrollState = {};
   }
 
-  UNSAFE_componentWillMount() {
+  componentDidMount() {
     this.getCommand();
     this.getAssets();
   }
 
   componentDidUpdate(prevProps, prevState) {
-    const scrollThreshold = 5;
-    this.state.results.forEach((result) => {
-      const textarea = document.getElementById(`textarea-${result.title}`);
-      if (textarea !== null) {
-        if (this.scrollState[result.title] !== undefined && Math.abs(textarea.scrollTop - this.scrollState[result.title]) > scrollThreshold) {
-          return;
+    if (prevState.command?.assets !== this.state.command?.assets) {
+      this.state.command.assets.forEach((asset) => {
+        if (this.state.terminals.get(asset) === undefined) {
+          const term = new Terminal({
+            fontFamily: "monaco, Consolas, \"Lucida Console\", monospace",
+            fontSize: 15,
+            rendererType: "canvas",
+            convertEol: true,
+            cursorBlink: true,
+            cursorStyle: "block",
+            rightClickSelectsWord: true,
+          });
+
+          const webLinksAddon = new WebLinksAddon();
+          const fitAddon = new FitAddon();
+          term.loadAddon(webLinksAddon);
+          term.loadAddon(fitAddon);
+
+          term.open(document.getElementById(`terminal-${asset}`));
+          fitAddon.fit();
+          this.state.terminals.set(asset, term);
         }
-        textarea.scrollTop = textarea.scrollHeight;
-        this.scrollState[result.title] = textarea.scrollTop;
-      }
-    });
+      });
+    }
   }
 
   getCommand() {
@@ -60,9 +76,6 @@ class CommandEditPage extends React.Component {
         if (res.status === "ok") {
           this.setState({
             command: res.data,
-            results: res.data.assets.map(asset => {
-              return {title: asset, text: ""};
-            }),
           });
         } else {
           Setting.showMessage("error", `Failed to get command: ${res.msg}`);
@@ -160,18 +173,7 @@ class CommandEditPage extends React.Component {
             <Select virtual={false} style={{width: "100%"}} mode="multiple" value={command.assets}
               options={this.state.assets.filter(asset => asset.type === "SSH").map(asset => Setting.getOption(asset.displayName, asset.name))}
               onChange={value => {
-                const results = [];
-                value.forEach((asset) => {
-                  if (this.state.results.find(result => result.title === asset) !== undefined) {
-                    results.push(this.state.results.find(result => result.title === asset));
-                  } else {
-                    results.push({title: asset, text: ""});
-                  }
-                });
                 this.updateCommandField("assets", value);
-                this.setState({
-                  results: results,
-                });
               }}
             />
           </Col>
@@ -188,25 +190,11 @@ class CommandEditPage extends React.Component {
                   if (jsonData.text === "") {
                     jsonData.text = "\n";
                   }
-                  const results = this.state.results;
-                  if (this.state.results.find(result => result.title === asset) === undefined) {
-                    results.push({title: asset, text: jsonData.text});
-                  } else {
-                    results.find(result => result.title === asset).text += jsonData.text + "\n";
-                  }
-                  this.setState({
-                    results: results,
-                  });
+                  const terminal = this.state.terminals.get(asset);
+                  terminal.write(jsonData.text + "\n");
                 }, (error) => {
-                  const results = this.state.results;
-                  if (this.state.results.find(result => result.title === asset) === undefined) {
-                    results.push({title: asset, text: error});
-                  } else {
-                    results.find(result => result.title === asset).text += error;
-                  }
-                  this.setState({
-                    results: results,
-                  });
+                  const terminal = this.state.terminals.get(asset);
+                  terminal.write(error + "\n");
                 });
               }
               );
@@ -225,41 +213,28 @@ class CommandEditPage extends React.Component {
                 gutter: 16,
                 column: 2,
               }}
-              dataSource={this.state.results}
-              renderItem={(item, index) => (
+              dataSource={this.state.command?.assets}
+              renderItem={(item) => (
                 <List.Item>
-                  <Card title={item.title} size="small" extra={
+                  <Card title={item} size="small" extra={
                     <Button type="primary" onClick={() => {
-                      CommandBackend.execCommand(this.state.owner, this.state.commandName, item.title, (data) => {
+                      CommandBackend.execCommand(this.state.owner, this.state.commandName, item, (data) => {
                         const jsonData = JSON.parse(data);
                         if (jsonData.text === "") {
                           jsonData.text = "\n";
                         }
-                        const results = this.state.results;
-                        if (this.state.results.find(result => result.title === item.title) === undefined) {
-                          results.push({title: item.title, text: jsonData.text});
-                        } else {
-                          results.find(result => result.title === item.title).text += jsonData.text + "\n";
-                        }
-                        this.setState({
-                          results: results,
-                        });
+                        const terminal = this.state.terminals.get(item);
+                        terminal.write(jsonData.text + "\n");
                       }, (error) => {
-                        const results = this.state.results;
-                        if (this.state.results.find(result => result.title === item.title) === undefined) {
-                          results.push({title: item.title, text: error});
-                        } else {
-                          results.find(result => result.title === item.title).text += error;
-                        }
-                        this.setState({
-                          results: results,
-                        });
+                        const terminal = this.state.terminals.get(item);
+                        terminal.write(error + "\n");
                       });
                     }}>
                       {i18next.t("command:Run")}
                     </Button>
                   }>
-                    <Input.TextArea id={`textarea-${item.title}`} value={item.text} rows={8} readOnly />
+                    <div id={`terminal-${item}`}
+                    />
                   </Card>
                 </List.Item>
               )}

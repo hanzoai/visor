@@ -258,6 +258,14 @@ func (c *ApiController) ExecCommand() {
 	}
 }
 
+// GetExecOutput
+// @Title GetExecOutput
+// @Tag Command API
+// @Description get the output of the command
+// @Param   id	 query    string  true        "The id ( owner/name ) of the command"
+// @Success 200 {string} The Response object
+// @router /get-exec-output [get]
+
 func (c *ApiController) GetExecOutput() {
 	id := c.Input().Get("id")
 
