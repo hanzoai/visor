@@ -13,12 +13,13 @@
 // limitations under the License.
 
 import React from "react";
-import {Tooltip, message} from "antd";
+import {Tag, Tooltip, message} from "antd";
 import {isMobile as isMobileDevice} from "react-device-detect";
 import i18next from "i18next";
 import Sdk from "casdoor-js-sdk";
-import {QuestionCircleTwoTone} from "@ant-design/icons";
+import {QuestionCircleTwoTone, SyncOutlined} from "@ant-design/icons";
 import {v4 as uuidv4} from "uuid";
+import moment from "moment";
 
 export let ServerUrl = "";
 export let CasdoorSdk;
@@ -89,6 +90,17 @@ export function goToLinkSoft(ths, link) {
   ths.props.history.push(link);
 }
 
+export function downloadFile(filename, blob) {
+  const url = window.URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+
+  window.URL.revokeObjectURL(url);
+}
+
 export function showMessage(type, text) {
   if (type === "") {
     return;
@@ -126,6 +138,21 @@ export function deleteRow(array, i) {
 
 export function swapRow(array, i, j) {
   return [...array.slice(0, i), array[j], ...array.slice(i + 1, j), array[i], ...array.slice(j + 1)];
+}
+
+export function trim(str, ch) {
+  if (str === undefined) {
+    return undefined;
+  }
+
+  let start = 0;
+  let end = str.length;
+
+  while (start < end && str[start] === ch) {++start;}
+
+  while (end > start && str[end - 1] === ch) {--end;}
+
+  return (start > 0 || end < str.length) ? str.substring(start, end) : str;
 }
 
 export function isMobile() {
@@ -260,6 +287,43 @@ export function getAcceptLanguage() {
   return i18next.language + ";q=0.9,en;q=0.8";
 }
 
+export function getTag(text, type, state) {
+  let icon = null;
+  let style = {};
+  if (state === "Pending") {
+    icon = <SyncOutlined spin />;
+    style = {borderStyle: "dashed", backgroundColor: "white"};
+  }
+
+  if (type === "Read") {
+    return (
+      <Tooltip placement="top" title={"Read"}>
+        <Tag icon={icon} style={style} color={"success"}>
+          {text}
+        </Tag>
+      </Tooltip>
+    );
+  } else if (type === "Write") {
+    return (
+      <Tooltip placement="top" title={"Write"}>
+        <Tag icon={icon} style={style} color={"processing"}>
+          {text}
+        </Tag>
+      </Tooltip>
+    );
+  } else if (type === "Admin") {
+    return (
+      <Tooltip placement="top" title={"Admin"}>
+        <Tag icon={icon} style={style} color={"error"}>
+          {text}
+        </Tag>
+      </Tooltip>
+    );
+  } else {
+    return null;
+  }
+}
+
 export const StaticBaseUrl = "https://cdn.casbin.org";
 
 export const Countries = [{label: "English", key: "en", country: "US", alt: "English"},
@@ -352,4 +416,117 @@ export function getNewRowNameForTable(table, rowName) {
     res = res + " ";
   }
   return res;
+}
+
+export function getRandomName() {
+  return Math.random().toString(36).slice(-6);
+}
+
+export function getFriendlyFileSize(size) {
+  if (size < 1024) {
+    return size + " B";
+  }
+
+  const i = Math.floor(Math.log(size) / Math.log(1024));
+  let num = (size / Math.pow(1024, i));
+  const round = Math.round(num);
+  num = round < 10 ? num.toFixed(2) : round < 100 ? num.toFixed(1) : round;
+  return `${num} ${"KMGTPEZY"[i - 1]}B`;
+}
+
+export function getTreeWithParents(tree) {
+  const res = deepCopy(tree);
+  res.children = tree.children?.map((file, index) => {
+    file.parent = tree;
+    return getTreeWithParents(file);
+  });
+  return res;
+}
+
+export function getTreeWithSearch(tree, s) {
+  const res = deepCopy(tree);
+  res.children = tree.children.map((file, index) => {
+    if (file.children.length === 0) {
+      if (file.title.includes(s)) {
+        return file;
+      } else {
+        return null;
+      }
+    } else {
+      const tmpTree = getTreeWithSearch(file, s);
+      if (tmpTree.children.length !== 0) {
+        return tmpTree;
+      } else {
+        if (file.title.includes(s)) {
+          return file;
+        } else {
+          return null;
+        }
+      }
+    }
+  }).filter((file, index) => {
+    return file !== null;
+  });
+  return res;
+}
+
+export function getExtFromPath(path) {
+  const filename = path.split("/").pop();
+  if (filename.includes(".")) {
+    return filename.split(".").pop().toLowerCase();
+  } else {
+    return "";
+  }
+}
+
+export function getExtFromFile(file) {
+  const res = file.title.split(".")[1];
+  if (res === undefined) {
+    return "";
+  } else {
+    return res;
+  }
+}
+
+export function getFileCategory(file) {
+  if (file.isLeaf) {
+    return i18next.t("store:File");
+  } else {
+    return i18next.t("store:Folder");
+  }
+}
+
+export function getDistinctArray(arr) {
+  return [...new Set(arr)];
+}
+
+export function getCollectedTime(filename) {
+  // 20220827_210300_CH~Logo.png
+  const tokens = filename.split("~");
+  if (tokens.length < 2) {
+    return null;
+  }
+
+  const time = tokens[0].slice(0, -3);
+  const m = new moment(time, "YYYYMMDD_HH:mm:ss");
+  return m.format();
+}
+
+export function getSubject(filename) {
+  // 20220827_210300_CH~Logo.png
+  const tokens = filename.split("~");
+  if (tokens.length < 2) {
+    return null;
+  }
+
+  const subject = tokens[0].slice(tokens[0].length - 2);
+  if (subject === "MA") {
+    return i18next.t("store:Math");
+  } else if (subject === "CH") {
+    return i18next.t("store:Chinese");
+  } else if (subject === "NU") {
+    return null;
+  } else {
+    return subject;
+  }
 }

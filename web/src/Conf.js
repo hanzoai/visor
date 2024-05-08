@@ -24,6 +24,7 @@ export const AuthConfig = {
 export const ForceLanguage = "";
 export const DefaultLanguage = "en";
 export const IsDemoMode = false;
+export const EnableExtraPages = false;
 
 export const ThemeDefault = {
   themeType: "default",
@@ -31,3 +32,5 @@ export const ThemeDefault = {
   borderRadius: 6,
   isCompact: false,
 };
+
+export const AppUrl = "";

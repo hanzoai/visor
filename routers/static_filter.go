@@ -15,7 +15,9 @@
 package routers
 
 import (
+	"compress/gzip"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -24,6 +26,12 @@ import (
 	"github.com/beego/beego/context"
 	"github.com/casvisor/casvisor/conf"
 	"github.com/casvisor/casvisor/util"
+)
+
+const (
+	headerAllowOrigin  = "Access-Control-Allow-Origin"
+	headerAllowMethods = "Access-Control-Allow-Methods"
+	headerAllowHeaders = "Access-Control-Allow-Headers"
 )
 
 var (
@@ -43,6 +51,17 @@ func TransparentStatic(ctx *context.Context) {
 		return
 	}
 
+	if strings.HasPrefix(urlPath, "/storage") {
+		ctx.Output.Header(headerAllowOrigin, "*")
+		ctx.Output.Header(headerAllowMethods, "POST, GET, OPTIONS, DELETE")
+		ctx.Output.Header(headerAllowHeaders, "Content-Type, Authorization")
+
+		urlPath = strings.TrimPrefix(urlPath, "/storage/")
+		urlPath = strings.Replace(urlPath, "|", ":", 1)
+		makeGzipResponse(ctx.ResponseWriter, ctx.Request, urlPath)
+		return
+	}
+
 	path := "web/build"
 	if urlPath == "/" {
 		path += "/index.html"
@@ -53,8 +72,7 @@ func TransparentStatic(ctx *context.Context) {
 	if !util.FileExist(path) {
 		path = "web/build/index.html"
 	}
-
-	serveFileWithReplace(ctx.ResponseWriter, ctx.Request, path)
+	makeGzipResponse(ctx.ResponseWriter, ctx.Request, path)
 }
 
 func serveFileWithReplace(w http.ResponseWriter, r *http.Request, name string) {
@@ -84,4 +102,25 @@ func serveFileWithReplace(w http.ResponseWriter, r *http.Request, name string) {
 	}
 
 	http.ServeContent(w, r, d.Name(), d.ModTime(), strings.NewReader(content))
+}
+
+type gzipResponseWriter struct {
+	io.Writer
+	http.ResponseWriter
+}
+
+func (w gzipResponseWriter) Write(b []byte) (int, error) {
+	return w.Writer.Write(b)
+}
+
+func makeGzipResponse(w http.ResponseWriter, r *http.Request, path string) {
+	if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+		serveFileWithReplace(w, r, path)
+		return
+	}
+	w.Header().Set("Content-Encoding", "gzip")
+	gz := gzip.NewWriter(w)
+	defer gz.Close()
+	gzw := gzipResponseWriter{Writer: gz, ResponseWriter: w}
+	serveFileWithReplace(gzw, r, path)
 }

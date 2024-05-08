@@ -20,6 +20,7 @@ import (
 
 	"github.com/casvisor/casvisor/util"
 	"github.com/casvisor/casvisor/util/guacamole"
+	"github.com/casvisor/casvisor/util/term"
 	"xorm.io/core"
 )
 
@@ -193,9 +194,25 @@ func CreateSession(session *Session, assetId, mode string) (*Session, error) {
 		return nil, err
 	}
 
+	if mode == "file" {
+		terminal, err := term.NewTerminal(asset.GetAddr(), asset.Username, asset.Password)
+		if err != nil {
+			return nil, err
+		}
+
+		gSession := &util.GlobalSession{
+			Id:       session.GetId(),
+			Protocol: session.Protocol,
+			Mode:     mode,
+			Terminal: terminal,
+		}
+		util.GlobalSessionManager.Add(gSession)
+	}
+
 	respSession := &Session{
 		Owner:      session.Owner,
 		Name:       session.Name,
+		Asset:      assetId,
 		Protocol:   asset.Type,
 		Operations: session.Operations,
 	}
@@ -236,7 +253,7 @@ func CloseDBSession(id string, code int, msg string) error {
 	return nil
 }
 
-func WriteCloseMessage(session *guacamole.Session, mode string, code int, msg string) {
+func WriteCloseMessage(session *util.GlobalSession, mode string, code int, msg string) {
 	err := guacamole.NewInstruction("error", "", strconv.Itoa(code))
 	_ = session.WriteString(err.String())
 	disconnect := guacamole.NewInstruction("disconnect")
@@ -248,18 +265,18 @@ var mutex sync.Mutex
 func CloseSession(id string, code int, msg string) error {
 	mutex.Lock()
 	defer mutex.Unlock()
-	guacSession := guacamole.GlobalSessionManager.Get(id)
+	guacSession := util.GlobalSessionManager.Get(id)
 
 	if guacSession != nil {
 		WriteCloseMessage(guacSession, guacSession.Mode, code, msg)
 
 		if guacSession.Observer != nil {
-			guacSession.Observer.Range(func(key string, ob *guacamole.Session) {
+			guacSession.Observer.Range(func(key string, ob *util.GlobalSession) {
 				WriteCloseMessage(ob, ob.Mode, code, msg)
 			})
 		}
 	}
-	guacamole.GlobalSessionManager.Delete(id)
+	util.GlobalSessionManager.Delete(id)
 
 	err := CloseDBSession(id, code, msg)
 	if err != nil {

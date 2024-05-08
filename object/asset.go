@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/casvisor/casvisor/conf"
+
 	"github.com/casvisor/casvisor/dbgate"
 	"github.com/casvisor/casvisor/util"
 	"xorm.io/core"
@@ -232,6 +234,20 @@ func DeleteAsset(asset *Asset) (bool, error) {
 
 func (asset *Asset) GetId() string {
 	return fmt.Sprintf("%s/%s", asset.Owner, asset.Name)
+}
+
+func (asset *Asset) GetAddr() string {
+	if asset == nil {
+		return ""
+	}
+
+	var addr string
+	if asset.GatewayPort != 0 {
+		addr = fmt.Sprintf("%s:%d", conf.GatewayAddr.IP, asset.GatewayPort)
+	} else {
+		addr = fmt.Sprintf("%s:%d", asset.Endpoint, asset.Port)
+	}
+	return addr
 }
 
 func GetAssetsByName(owner, name string, isAdmin bool) ([]*Asset, error) {

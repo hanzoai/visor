@@ -133,15 +133,15 @@ func NewRecord(ctx *context.Context) *Record {
 	return &record
 }
 
-func AddRecord(record *Record) bool {
+func AddRecord(record *Record) (bool, error) {
 	record.Owner = record.Organization
 
 	affected, err := adapter.Engine.Insert(record)
 	if err != nil {
-		panic(err)
+		return false, err
 	}
 
-	return affected != 0
+	return affected != 0, nil
 }
 
 func DeleteRecord(record *Record) (bool, error) {

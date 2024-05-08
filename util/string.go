@@ -17,7 +17,8 @@ package util
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -100,7 +101,7 @@ func GetIdFromOwnerAndName(owner string, name string) string {
 }
 
 func ReadStringFromPath(path string) string {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		panic(err)
 	}
@@ -109,14 +110,14 @@ func ReadStringFromPath(path string) string {
 }
 
 func WriteStringToPath(s string, path string) {
-	err := ioutil.WriteFile(path, []byte(s), 0o644)
+	err := os.WriteFile(path, []byte(s), 0o644)
 	if err != nil {
 		panic(err)
 	}
 }
 
 func ReadBytesFromPath(path string) []byte {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		panic(err)
 	}
@@ -125,7 +126,7 @@ func ReadBytesFromPath(path string) []byte {
 }
 
 func WriteBytesToPath(b []byte, path string) {
-	err := ioutil.WriteFile(path, b, 0o644)
+	err := os.WriteFile(path, b, 0o644)
 	if err != nil {
 		panic(err)
 	}
@@ -149,4 +150,30 @@ func SnakeString(s string) string {
 		newstr = append(newstr, c)
 	}
 	return strings.ReplaceAll(string(newstr), " ", "")
+}
+
+func EnsureFileFolderExists(path string) {
+	p := GetPath(path)
+	if !FileExist(p) {
+		err := os.MkdirAll(p, os.ModePerm)
+		if err != nil {
+			panic(err)
+		}
+	}
+}
+
+func GetPath(path string) string {
+	return filepath.Dir(path)
+}
+
+func CopyFile(dest string, src string) {
+	bs, err := os.ReadFile(src)
+	if err != nil {
+		panic(err)
+	}
+
+	err = os.WriteFile(dest, bs, 0o644)
+	if err != nil {
+		panic(err)
+	}
 }

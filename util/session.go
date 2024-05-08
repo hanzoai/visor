@@ -12,20 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package guacamole
+package util
 
 import (
 	"sync"
 
+	"github.com/casvisor/casvisor/util/guacamole"
+	"github.com/casvisor/casvisor/util/term"
+
 	"github.com/gorilla/websocket"
 )
 
-type Session struct {
+type GlobalSession struct {
 	Id          string
 	Protocol    string
 	Mode        string
 	WebSocket   *websocket.Conn
-	GuacdTunnel *Tunnel
+	GuacdTunnel *guacamole.Tunnel
+	Terminal    *term.Terminal
 	Observer    *Manager
 	mutex       sync.Mutex
 
@@ -33,7 +37,7 @@ type Session struct {
 	Hostname string
 }
 
-func (s *Session) WriteString(str string) error {
+func (s *GlobalSession) WriteString(str string) error {
 	if s.WebSocket == nil {
 		return nil
 	}
@@ -43,13 +47,17 @@ func (s *Session) WriteString(str string) error {
 	return s.WebSocket.WriteMessage(websocket.TextMessage, message)
 }
 
-func (s *Session) Close() {
+func (s *GlobalSession) Close() {
 	if s.GuacdTunnel != nil {
 		_ = s.GuacdTunnel.Close()
 	}
 
 	if s.WebSocket != nil {
 		_ = s.WebSocket.Close()
+	}
+
+	if s.Terminal != nil {
+		_ = s.Terminal.Close()
 	}
 }
 
@@ -68,15 +76,15 @@ func NewObserver(id string) *Manager {
 	}
 }
 
-func (m *Manager) Get(id string) *Session {
+func (m *Manager) Get(id string) *GlobalSession {
 	value, ok := m.sessions.Load(id)
 	if ok {
-		return value.(*Session)
+		return value.(*GlobalSession)
 	}
 	return nil
 }
 
-func (m *Manager) Add(s *Session) {
+func (m *Manager) Add(s *GlobalSession) {
 	m.sessions.Store(s.Id, s)
 }
 
@@ -93,7 +101,7 @@ func (m *Manager) Delete(id string) {
 
 func (m *Manager) Clear() {
 	m.sessions.Range(func(key, value interface{}) bool {
-		if session, ok := value.(*Session); ok {
+		if session, ok := value.(*GlobalSession); ok {
 			session.Close()
 		}
 		m.sessions.Delete(key)
@@ -101,9 +109,9 @@ func (m *Manager) Clear() {
 	})
 }
 
-func (m *Manager) Range(f func(key string, value *Session)) {
+func (m *Manager) Range(f func(key string, value *GlobalSession)) {
 	m.sessions.Range(func(key, value interface{}) bool {
-		if session, ok := value.(*Session); ok {
+		if session, ok := value.(*GlobalSession); ok {
 			f(key.(string), session)
 		}
 		return true

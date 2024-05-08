@@ -24,6 +24,7 @@ import (
 	"github.com/casvisor/casvisor/object"
 	"github.com/casvisor/casvisor/util"
 	"github.com/casvisor/casvisor/util/guacamole"
+	"github.com/casvisor/casvisor/util/term"
 	"github.com/gorilla/websocket"
 )
 
@@ -37,6 +38,7 @@ const (
 	ParametersError    int = 804
 	AssetNotFound      int = 805
 	SessionUpdateError int = 806
+	NewSshClientError  int = 807
 )
 
 var UpGrader = websocket.Upgrader{
@@ -135,15 +137,24 @@ func (c *ApiController) GetAssetTunnel() {
 		return
 	}
 
-	guacSession := &guacamole.Session{
+	gSession := &util.GlobalSession{
 		Id:          sessionId,
 		Protocol:    session.Protocol,
 		WebSocket:   ws,
 		GuacdTunnel: tunnel,
 	}
 
-	guacSession.Observer = guacamole.NewObserver(sessionId)
-	guacamole.GlobalSessionManager.Add(guacSession)
+	if asset.Type == "SSH" {
+		terminal, err := term.NewTerminal(asset.GetAddr(), asset.Username, asset.Password)
+		if err != nil {
+			guacamole.Disconnect(ws, NewSshClientError, "failed to creat SSH client: "+err.Error())
+			return
+		}
+		gSession.Terminal = terminal
+	}
+
+	gSession.Observer = util.NewObserver(sessionId)
+	util.GlobalSessionManager.Add(gSession)
 
 	session.ConnectionId = tunnel.ConnectionID
 	session.Width = intWidth
@@ -223,20 +234,20 @@ func (c *ApiController) TunnelMonitor() {
 		panic(err)
 	}
 
-	guacSession := &guacamole.Session{
+	gSession := &util.GlobalSession{
 		Id:          sessionId,
 		Protocol:    s.Protocol,
 		WebSocket:   ws,
 		GuacdTunnel: tunnel,
 	}
 
-	forObsSession := guacamole.GlobalSessionManager.Get(sessionId)
+	forObsSession := util.GlobalSessionManager.Get(sessionId)
 	if forObsSession == nil {
 		guacamole.Disconnect(ws, SessionNotFound, "Failed to obtain session")
 		return
 	}
-	guacSession.Id = util.GenerateId()
-	forObsSession.Observer.Add(guacSession)
+	gSession.Id = util.GenerateId()
+	forObsSession.Observer.Add(gSession)
 
 	guacamoleHandler := NewGuacamoleHandler(ws, tunnel)
 	guacamoleHandler.Start()
@@ -247,7 +258,7 @@ func (c *ApiController) TunnelMonitor() {
 		if err != nil {
 			_ = tunnel.Close()
 
-			observerId := guacSession.Id
+			observerId := gSession.Id
 			forObsSession.Observer.Delete(observerId)
 			return
 		}

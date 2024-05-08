@@ -179,7 +179,7 @@ class AssetListPage extends BaseListPage {
         title: i18next.t("general:Action"),
         dataIndex: "action",
         key: "action",
-        width: "260px",
+        width: "300px",
         fixed: (Setting.isMobile()) ? "false" : "right",
         render: (text, record, index) => {
           return (
@@ -199,6 +199,16 @@ class AssetListPage extends BaseListPage {
                 }}
               >
                 {i18next.t("general:Connect")}
+              </Button>
+              <Button
+                style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}}
+                type="primary"
+                onClick={() => {
+                  const link = `/assets/${record.owner}/${record.name}/view`;
+                  Setting.goToLink(link);
+                }}
+              >
+                {i18next.t("asset:file")}
               </Button>
               <Button
                 disabled={!Setting.isAdminUser(this.props.account) && (record.owner !== this.props.account.owner)}

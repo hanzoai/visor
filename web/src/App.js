@@ -37,6 +37,7 @@ import AccessPage from "./component/access/AccessPage";
 import DatabasesPage from "./DatabasesPage";
 import CommandListPage from "./CommandListPage";
 import CommandEditPage from "./CommandEditPage";
+import FileTreePage from "./FileTreePage";
 
 const {Header, Footer, Content} = Layout;
 
@@ -238,6 +239,7 @@ class App extends Component {
         <Route exact path="/" render={(props) => this.renderSigninIfNotSignedIn(<ShortcutsPage account={this.state.account} {...props} />)} />
         <Route exact path="/assets" render={(props) => this.renderSigninIfNotSignedIn(<AssetListPage account={this.state.account} {...props} />)} />
         <Route exact path="/assets/:organizationName/:assetName" render={(props) => this.renderSigninIfNotSignedIn(<AssetEditPage account={this.state.account} {...props} />)} />
+        <Route exact path="/assets/:organizationName/:assetName/view" render={(props) => this.renderSigninIfNotSignedIn(<FileTreePage account={this.state.account} {...props} />)} />
         <Route exact path="/databases" render={(props) => this.renderSigninIfNotSignedIn(<DatabasesPage account={this.state.account} {...props} />)} />
         <Route exact path="/sessions" render={(props) => this.renderSigninIfNotSignedIn(<SessionListPage account={this.state.account} {...props} />)} />
         <Route exact path="/records" render={(props) => this.renderSigninIfNotSignedIn(<RecordListPage account={this.state.account} {...props} />)} />

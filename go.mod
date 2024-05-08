@@ -10,6 +10,7 @@ require (
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.1
+	github.com/pkg/sftp v1.13.6
 	github.com/qiangmzsx/string-adapter/v2 v2.2.0
 	github.com/sheerun/queue v1.0.1
 	github.com/ua-parser/uap-go v0.0.0-20240113215029-33f8e6d47f38
@@ -31,6 +32,7 @@ require (
 	github.com/gomodule/redigo v2.0.0+incompatible // indirect
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/kr/fs v0.1.0 // indirect
 	github.com/lib/pq v1.10.9 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect

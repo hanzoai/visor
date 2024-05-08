@@ -65,4 +65,16 @@ func initAPI() {
 	beego.Router("/api/delete-command", &controllers.ApiController{}, "POST:DeleteCommand")
 	beego.Router("/api/exec-command", &controllers.ApiController{}, "GET:ExecCommand")
 	beego.Router("/api/get-exec-output", &controllers.ApiController{}, "GET:GetExecOutput")
+
+	beego.Router("/api/update-file", &controllers.ApiController{}, "POST:UpdateFile")
+	beego.Router("/api/delete-file", &controllers.ApiController{}, "POST:DeleteFile")
+	beego.Router("/api/get-file", &controllers.ApiController{}, "GET:DownloadFile")
+	beego.Router("/api/add-file", &controllers.ApiController{}, "POST:AddFile")
+	beego.Router("/api/get-files", &controllers.ApiController{}, "POST:GetFiles")
+
+	beego.Router("/api/get-permissions", &controllers.ApiController{}, "GET:GetPermissions")
+	beego.Router("/api/get-permission", &controllers.ApiController{}, "GET:GetPermission")
+	beego.Router("/api/update-permission", &controllers.ApiController{}, "POST:UpdatePermission")
+	beego.Router("/api/add-permission", &controllers.ApiController{}, "POST:AddPermission")
+	beego.Router("/api/delete-permission", &controllers.ApiController{}, "POST:DeletePermission")
 }
