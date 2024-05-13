@@ -157,7 +157,7 @@ class CommandEditPage extends React.Component {
         </Row>
         <Row style={{marginTop: "20px"}} >
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-            {Setting.getLabel(i18next.t("command:Command"), i18next.t("command:Command - Tooltip"))} :
+            {Setting.getLabel(i18next.t("general:Command"), i18next.t("general:Command - Tooltip"))} :
           </Col>
           <Col span={22} >
             <Input.TextArea value={command.command} rows={4} onChange={e => {
