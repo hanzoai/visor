@@ -1,37 +1,57 @@
-version: '3.1'
 services:
   casvisor:
     restart: always
-    build:
-      context: ./
-      dockerfile: Dockerfile
-      target: STANDARD
+    image: casbin/casvisor
     ports:
       - "19000:19000"
-      - "3000:3000"
     depends_on:
       - db
     environment:
       RUNNING_IN_DOCKER: "true"
     volumes:
       - ./conf:/home/casvisor/conf
+    deploy:
+      update_config:
+        order: start-first
+        failure_action: rollback
+        delay: 15s
+        parallelism: 1
+    networks:
+      - default
+
   db:
     restart: always
     image: mysql:8.0.25
-    platform: linux/amd64
-    ports:
-      - "3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: 123456
     volumes:
       - /usr/local/docker/mysql:/var/lib/mysql
+    deploy:
+      update_config:
+        order: stop-first
+        failure_action: rollback
+        delay: 0s
+        parallelism: 1
+    networks:
+      - default
+
   guacd:
     image: guacamole/guacd:latest
     environment:
       GUACD_LOG_LEVEL: debug
     volumes:
       - ./data/guacd:/usr/local/casvisor/data
-    ports:
-      - "4822:4822"
-    restart:
-      always
+    restart: always
+    depends_on:
+      - db
+    deploy:
+      update_config:
+        order: start-first
+        failure_action: rollback
+        delay: 0s
+        parallelism: 1
+    networks:
+      - default
+
+networks:
+  default:
