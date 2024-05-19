@@ -316,6 +316,19 @@ class AssetEditPage extends React.Component {
             }} />
           </Col>
         </Row>
+        {asset.category === "Machine" && asset.type !== "SSH" && (
+          <Row style={{marginTop: "20px"}} >
+            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+              {Setting.getLabel(i18next.t("asset:Enable SSH"), i18next.t("asset:Enable SSH - Tooltip"))} :
+            </Col>
+            <Col span={22} >
+              <Switch checked={asset.enableSsh} onChange={checked => {
+                this.updateAssetField("enableSsh", checked);
+              }
+              } />
+            </Col>
+          </Row>
+        )}
         <Row style={{marginTop: "20px"}}>
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
             {Setting.getLabel(i18next.t("asset:OS"), i18next.t("asset:OS - Tooltip"))} :

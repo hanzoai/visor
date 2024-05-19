@@ -45,6 +45,7 @@ func main() {
 	beego.InsertFilter("/*", beego.BeforeRouter, routers.TransparentStatic)
 	beego.InsertFilter("/dbgate/*", beego.BeforeRouter, routers.ProxyFilter)
 	beego.InsertFilter("/api/*", beego.BeforeRouter, routers.ApiFilter)
+	beego.InsertFilter("/api/*", beego.BeforeRouter, routers.MetricFilter)
 
 	if beego.AppConfig.String("redisEndpoint") == "" {
 		beego.BConfig.WebConfig.Session.SessionProvider = "file"

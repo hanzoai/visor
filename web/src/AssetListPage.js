@@ -14,7 +14,7 @@
 
 import React from "react";
 import {Link} from "react-router-dom";
-import {Button, Table, Tag} from "antd";
+import {Button, Progress, Table, Tag} from "antd";
 import BaseListPage from "./BaseListPage";
 import moment from "moment";
 import * as Setting from "./Setting";
@@ -25,7 +25,62 @@ import PopconfirmModal from "./common/modal/PopconfirmModal";
 class AssetListPage extends BaseListPage {
   constructor(props) {
     super(props);
+    this.state = {
+      ...this.state,
+      intervalId: null,
+    };
   }
+
+  componentDidMount() {
+    const id = setInterval(() => {
+      this.fetch({pagination: this.state.pagination, searchedColumn: this.state.searchedColumn, searchText: this.state.searchText, sortField: this.state.sortField, sortOrder: this.state.sortOrder}, true);
+    }, 1000);
+
+    this.setState({intervalId: id});
+  }
+
+  componentWillUnmount() {
+    if (this.state.intervalId !== null) {
+      clearInterval(this.state.intervalId);
+    }
+  }
+
+  fetchAssets = (params = {}) => {
+    let field = params.searchedColumn, value = params.searchText;
+    const sortField = params.sortField, sortOrder = params.sortOrder;
+    if (params.category) {
+      field = "category";
+      value = params.category;
+    } else if (params.type) {
+      field = "type";
+      value = params.type;
+    }
+
+    return AssetBackend.getAssets(
+      Setting.getRequestOrganization(this.props.account),
+      params.pagination.current,
+      params.pagination.pageSize,
+      field,
+      value,
+      sortField,
+      sortOrder
+    )
+      .then((res) => {
+        if (res.status === "ok") {
+          return {
+            data: res.data,
+            total: res.data2,
+          };
+        } else {
+          if (Setting.isResponseDenied(res)) {
+            this.setState({isAuthorized: false});
+          } else {
+            Setting.showMessage("error", res.msg);
+            throw new Error(res.msg);
+          }
+        }
+      });
+  };
 
   newAsset() {
     return {
@@ -176,6 +231,50 @@ class AssetListPage extends BaseListPage {
         sorter: (a, b) => a.username.localeCompare(b.username),
       },
       {
+        title: i18next.t("asset:CPU"),
+        dataIndex: "cpuCurrent",
+        key: "cpuCurrent",
+        width: "150px",
+        render: (text, record, index) => {
+          if (!record.isActive || record.cpuCurrent === 0) {
+            return "";
+          }
+          return <Progress steps={20} size={"small"}
+            percent={(text).toFixed(2)}
+          />;
+        },
+      },
+      {
+        title: i18next.t("asset:Memory"),
+        dataIndex: "memory",
+        key: "memory",
+        width: "150px",
+        render: (text, record, index) => {
+          if (!record.isActive || record.memTotal === 0) {
+            return "";
+          }
+
+          return <Progress steps={20} size={"small"}
+            percent={(record.memCurrent * 100 / record.memTotal).toFixed(2)}
+          />;
+        },
+      },
+      {
+        title: i18next.t("asset:Disk"),
+        dataIndex: "disk",
+        key: "disk",
+        width: "150px",
+        render: (text, record, index) => {
+          if (!record.isActive || record.diskTotal === 0) {
+            return "";
+          }
+
+          return <Progress steps={20} size={"small"}
+            percent={(record.diskCurrent * 100 / record.diskTotal).toFixed(2)}
+          />;
+        },
+      },
+      {
         title: i18next.t("general:Action"),
         dataIndex: "action",
         key: "action",
@@ -201,6 +300,7 @@ class AssetListPage extends BaseListPage {
                 {i18next.t("general:Connect")}
               </Button>
               <Button
+                disabled={record.category !== "Machine"}
                 style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}}
                 type="primary"
                 onClick={() => {
@@ -208,7 +308,7 @@ class AssetListPage extends BaseListPage {
                   Setting.goToLink(link);
                 }}
               >
-                {i18next.t("asset:file")}
+                {i18next.t("asset:Files")}
               </Button>
               <Button
                 disabled={!Setting.isAdminUser(this.props.account) && (record.owner !== this.props.account.owner)}
@@ -252,7 +352,7 @@ class AssetListPage extends BaseListPage {
     );
   }
 
-  fetch = (params = {}) => {
+  fetch = (params = {}, silent) => {
     let field = params.searchedColumn, value = params.searchText;
     const sortField = params.sortField, sortOrder = params.sortOrder;
     if (params.category) {
@@ -262,12 +362,14 @@ class AssetListPage extends BaseListPage {
       field = "type";
       value = params.type;
     }
-    this.setState({loading: true});
+    if (!silent) {
+      this.setState({loading: true});
+    }
     AssetBackend.getAssets(Setting.getRequestOrganization(this.props.account), params.pagination.current, params.pagination.pageSize, field, value, sortField, sortOrder)
       .then((res) => {
-        this.setState({
-          loading: false,
-        });
+        if (!silent) {
+          this.setState({loading: false});
+        }
         if (res.status === "ok") {
           this.setState({
             data: res.data,

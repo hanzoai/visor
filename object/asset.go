@@ -19,7 +19,6 @@ import (
 	"strconv"
 
 	"github.com/casvisor/casvisor/conf"
-
 	"github.com/casvisor/casvisor/dbgate"
 	"github.com/casvisor/casvisor/util"
 	"xorm.io/core"
@@ -77,15 +76,22 @@ type Asset struct {
 	RemoteApps      []*RemoteApp `json:"remoteApps"`
 	Services        []*Service   `json:"services"`
 	GatewayPort     int          `json:"gatewayPort"`
-
-	Id              string `xorm:"varchar(100)" json:"id"`
-	DatabaseUrl     string `xorm:"varchar(200)" json:"databaseUrl"`
-	UseDatabaseUrl  bool   `json:"useDatabaseUrl"`
-	DatabaseFile    string `xorm:"varchar(200)" json:"databaseFile"`
-	SocketPath      string `xorm:"varchar(200)" json:"socketPath"`
-	AuthType        string `xorm:"varchar(100)" json:"authType"`
-	DefaultDatabase string `xorm:"varchar(100)" json:"defaultDatabase"`
-	IsReadOnly      bool   `json:"isReadOnly"`
+	EnableSsh       bool         `json:"enableSsh"`
+	IsActive        bool         `json:"isActive"`
+	DiskCurrent     int64        `json:"diskCurrent"`
+	DiskTotal       int64        `json:"diskTotal"`
+	MemCurrent      int64        `json:"memCurrent"`
+	MemTotal        int64        `json:"memTotal"`
+	CpuCurrent      float32      `json:"cpuCurrent"`
+	CpuTotal        int          `json:"cpuTotal"`
+	Id              string       `xorm:"varchar(100)" json:"id"`
+	DatabaseUrl     string       `xorm:"varchar(200)" json:"databaseUrl"`
+	UseDatabaseUrl  bool         `json:"useDatabaseUrl"`
+	DatabaseFile    string       `xorm:"varchar(200)" json:"databaseFile"`
+	SocketPath      string       `xorm:"varchar(200)" json:"socketPath"`
+	AuthType        string       `xorm:"varchar(100)" json:"authType"`
+	DefaultDatabase string       `xorm:"varchar(100)" json:"defaultDatabase"`
+	IsReadOnly      bool         `json:"isReadOnly"`
 }
 
 func GetAssetCount(owner, field, value string) (int64, error) {

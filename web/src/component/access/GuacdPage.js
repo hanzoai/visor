@@ -72,8 +72,9 @@ const GuacdPage = (props) => {
     SessionBackend.addAssetTunnel(assetId).then((res) => {
       if (res.status === "ok") {
         const session = res.data;
+        session.id = `${session.owner}/${session.name}`;
         setSession(session);
-        renderDisplay(`${session.owner}/${session.name}`, session.protocol, box.width, box.height);
+        renderDisplay(session.id, session.protocol, box.width, box.height);
       } else {
         Setting.showMessage("error", "Failed to connect: " + res.msg);
       }
