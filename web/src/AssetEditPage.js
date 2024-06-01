@@ -169,6 +169,26 @@ class AssetEditPage extends React.Component {
     return asset;
   }
 
+  downLoadRdpFile(asset) {
+    const rdpContent = `
+      full address:s:${asset.endpoint}
+      username:s:${asset.username}
+      prompt for credentials:i:1
+        `;
+
+    const blob = new Blob([rdpContent], {type: "application/x-rdp"});
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${asset.name}.rdp`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+  }
+
   renderAsset() {
     const {asset} = this.state;
 
@@ -179,6 +199,11 @@ class AssetEditPage extends React.Component {
           <Button onClick={() => this.submitAssetEdit(false)}>{i18next.t("general:Save")}</Button>
           <Button style={{marginLeft: "20px"}} type="primary" onClick={() => this.submitAssetEdit(true)}>{i18next.t("general:Save & Exit")}</Button>
           {this.state.mode === "add" ? <Button style={{marginLeft: "20px"}} onClick={() => this.deleteAsset()}>{i18next.t("general:Cancel")}</Button> : null}
+          {(asset.type === "RDP" && this.state.mode !== "add") ?
+            <Button style={{marginLeft: "20px"}} type="primary" onClick={() => this.downLoadRdpFile(asset)}>
+              {i18next.t("asset:Download RDP file")}
+            </Button>
+            : null}
         </div>
       } style={{marginLeft: "5px"}} type="inner">
         <Row style={{marginTop: "10px"}} >

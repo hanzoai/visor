@@ -14,13 +14,14 @@
 
 import React from "react";
 import {Link} from "react-router-dom";
-import {Button, Progress, Table, Tag} from "antd";
+import {Button, Progress, Table, Tag, Upload} from "antd";
 import BaseListPage from "./BaseListPage";
 import moment from "moment";
 import * as Setting from "./Setting";
 import * as AssetBackend from "./backend/AssetBackend";
 import i18next from "i18next";
 import PopconfirmModal from "./common/modal/PopconfirmModal";
+import {UploadOutlined} from "@ant-design/icons";
 
 class AssetListPage extends BaseListPage {
   constructor(props) {
@@ -119,6 +120,21 @@ class AssetListPage extends BaseListPage {
       });
   }
 
+  addRdpAsset(newAsset) {
+    AssetBackend.addAsset(newAsset)
+      .then((res) => {
+        if (res.status === "ok") {
+          this.props.history.push({pathname: `/assets/${newAsset.owner}/${newAsset.name}`, mode: "add"});
+          Setting.showMessage("success", "Asset added successfully");
+        } else {
+          Setting.showMessage("error", `Failed to add Asset: ${res.msg}`);
+        }
+      })
+      .catch(error => {
+        Setting.showMessage("error", `Asset failed to add: ${error}`);
+      });
+  }
+
   deleteAsset(i) {
     AssetBackend.deleteAsset(this.state.data[i])
       .then((res) => {
@@ -138,6 +154,64 @@ class AssetListPage extends BaseListPage {
       .catch(error => {
         Setting.showMessage("error", `Asset failed to delete: ${error}`);
       });
+  }
+
+  parseRdpFile = (content) => {
+    const ipMatch = /full address:s:(.*)/.exec(content);
+    const usernameMatch = /username:s:(.*)/.exec(content);
+
+    const ip = ipMatch ? ipMatch[1].trim() : "";
+    const username = usernameMatch ? usernameMatch[1].trim() : "";
+    if (ip !== "" && username !== "") {
+      const asset = this.newAsset();
+      asset.endpoint = ip;
+      asset.username = username;
+      asset.type = "RDP";
+      asset.port = 3389;
+      return asset;
+    } else {
+      Setting.showMessage("error", i18next.t("asset:Invalid RDP file"));
+      return null;
+    }
+  };
+
+  beforeUpload = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const contents = e.target.result;
+        const fileName = file.name.replace(/\.rdp$/i, "");
+        const asset = this.parseRdpFile(contents);
+        if (asset !== null) {
+          asset.name = fileName;
+          asset.displayName = fileName;
+          this.addRdpAsset(asset);
+        }
+        this.handleFileRemove(file);
+        resolve();
+      };
+      reader.readAsText(file);
+    });
+  };
+
+  handleFileRemove(file) {
+    this.uploadComponentRef.current && this.uploadComponentRef.current.onRemove(file);
+  }
+
+  renderUpload() {
+    const props = {
+      name: "file",
+      accept: ".rdp",
+      beforeUpload: this.beforeUpload,
+    };
+
+    return (
+      <Upload {...props} ref={(ref) => (this.uploadComponentRef = ref)}>
+        <Button id="upload-button" type="primary" size="small">
+          <UploadOutlined /> {i18next.t("asset:Upload") + "(.rdp)"}
+        </Button>
+      </Upload>
+    );
   }
 
   renderTable(assets) {
@@ -343,6 +417,10 @@ class AssetListPage extends BaseListPage {
             <div>
               {i18next.t("general:Assets")}&nbsp;&nbsp;&nbsp;&nbsp;
               <Button type="primary" size="small" disabled={!Setting.isAdminUser(this.props.account)} onClick={this.addAsset.bind(this)}>{i18next.t("general:Add")}</Button>
+              &nbsp;&nbsp;
+              {
+                this.renderUpload()
+              }
             </div>
           )}
           loading={this.state.loading}

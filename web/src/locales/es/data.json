@@ -12,17 +12,20 @@
     "CPU": "CPU",
     "Cannot enable Remote App when Remote Apps are empty. Please add at least one Remote App in below table first, then enable again": "Cannot enable Remote App when Remote Apps are empty. Please add at least one Remote App in below table first, then enable again",
     "Disk": "Disk",
+    "Download RDP file": "Download RDP file",
     "Edit Asset": "Edit Asset",
     "Enable SSH": "Enable SSH",
     "Enable SSH - Tooltip": "Enable SSH - Tooltip",
     "Files": "Files",
     "Gatewat port": "Gatewat port",
     "Gatewat port - Tooltip": "Gatewat port - Tooltip",
+    "Invalid RDP file": "Invalid RDP file",
     "Memory": "Memory",
     "New Asset": "New Asset",
     "OS": "OS",
     "OS - Tooltip": "OS - Tooltip",
-    "Please select a asset": "Please select a asset"
+    "Please select a asset": "Please select a asset",
+    "Upload": "Upload"
   },
   "command": {
     "Edit Command": "Edit Command",

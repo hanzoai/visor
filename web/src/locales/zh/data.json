@@ -12,17 +12,20 @@
     "CPU": "CPU",
     "Cannot enable Remote App when Remote Apps are empty. Please add at least one Remote App in below table first, then enable again": "当远程应用为空时不能启用远程应用。请先在下表中添加至少一个远程应用，然后再次启用",
     "Disk": "磁盘",
+    "Download RDP file": "下载RDP文件",
     "Edit Asset": "编辑资产",
     "Enable SSH": "开启SSH",
     "Enable SSH - Tooltip": "机器是否开启支持SSH协议",
     "Files": "文件",
     "Gatewat port": "网关端口",
     "Gatewat port - Tooltip": "内网穿透服务器代理的远程监听端口",
+    "Invalid RDP file": "错误的RDP文件",
     "Memory": "内存",
     "New Asset": "新建资产",
     "OS": "操作系统",
     "OS - Tooltip": "操作系统 - 工具提示",
-    "Please select a asset": "请选择一个资产"
+    "Please select a asset": "请选择一个资产",
+    "Upload": "上传"
   },
   "command": {
     "Edit Command": "编辑命令",
