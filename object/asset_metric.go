@@ -50,10 +50,15 @@ func RunUpdateAssetMetrics() {
 func UpdateAssetMetric(asset *Asset) error {
 	client, err := GetSshClient(asset)
 	if err != nil {
-		asset.IsActive = false
+		asset.Status = AssetStatusStopped
+		_, updateErr := adapter.Engine.ID(core.PK{asset.Owner, asset.Name}).AllCols().Update(asset)
+		if updateErr != nil {
+			return updateErr
+		}
 		return fmt.Errorf("%s: %s", asset.GetId(), err.Error())
 	}
-	asset.IsActive = true
+
+	asset.Status = AssetStatusRunning
 
 	stat := &metric.Stat{}
 	stat, err = metric.GetAllStat(client, stat)

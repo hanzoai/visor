@@ -23,6 +23,9 @@ import i18next from "i18next";
 import PopconfirmModal from "./common/modal/PopconfirmModal";
 import {UploadOutlined} from "@ant-design/icons";
 
+const AssetStatusRunning = "Running";
+const AssetStatusStopped = "Stopped";
+
 class AssetListPage extends BaseListPage {
   constructor(props) {
     super(props);
@@ -305,14 +308,27 @@ class AssetListPage extends BaseListPage {
         sorter: (a, b) => a.username.localeCompare(b.username),
       },
       {
+        title: i18next.t("general:Status"),
+        dataIndex: "status",
+        key: "status",
+        width: "100px",
+        render: (text, record, index) => {
+          if (record.category !== "Machine" || record.status === "") {
+            return "";
+          }
+          return <Tag color={text === AssetStatusRunning ? "green" : "red"}>{text}</Tag>;
+        },
+      },
+      {
         title: i18next.t("asset:CPU"),
         dataIndex: "cpuCurrent",
         key: "cpuCurrent",
         width: "150px",
         render: (text, record, index) => {
-          if (!record.isActive || record.cpuCurrent === 0) {
+          if (record.status !== AssetStatusRunning) {
             return "";
           }
+
           return <Progress steps={20} size={"small"}
             percent={(text).toFixed(2)}
           />;
@@ -324,7 +340,7 @@ class AssetListPage extends BaseListPage {
         key: "memory",
         width: "150px",
         render: (text, record, index) => {
-          if (!record.isActive || record.memTotal === 0) {
+          if (record.status !== AssetStatusRunning) {
             return "";
           }
 
@@ -339,7 +355,7 @@ class AssetListPage extends BaseListPage {
         key: "disk",
         width: "150px",
         render: (text, record, index) => {
-          if (!record.isActive || record.diskTotal === 0) {
+          if (record.status !== AssetStatusRunning) {
             return "";
           }
 
@@ -358,7 +374,7 @@ class AssetListPage extends BaseListPage {
           return (
             <div>
               <Button
-                disabled={!Setting.isAdminUser(this.props.account) && (record.owner !== this.props.account.owner)}
+                disabled={!Setting.isAdminUser(this.props.account) && (record.owner !== this.props.account.owner) || record.status === AssetStatusStopped}
                 style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}}
                 type="primary"
                 onClick={() => {
@@ -374,7 +390,7 @@ class AssetListPage extends BaseListPage {
                 {i18next.t("general:Connect")}
               </Button>
               <Button
-                disabled={record.category !== "Machine"}
+                disabled={record.category !== "Machine" || record.status === AssetStatusStopped}
                 style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}}
                 type="primary"
                 onClick={() => {

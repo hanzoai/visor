@@ -29,6 +29,11 @@ var (
 	RestartClientChan chan string
 )
 
+const (
+	AssetStatusRunning = "Running"
+	AssetStatusStopped = "Stopped"
+)
+
 func init() {
 	dataStore = dbgate.NewConnectionDataStore()
 	RestartClientChan = make(chan string)
@@ -77,7 +82,7 @@ type Asset struct {
 	Services        []*Service   `json:"services"`
 	GatewayPort     int          `json:"gatewayPort"`
 	EnableSsh       bool         `json:"enableSsh"`
-	IsActive        bool         `json:"isActive"`
+	Status          string       `xorm:"varchar(20)" json:"status"`
 	DiskCurrent     int64        `json:"diskCurrent"`
 	DiskTotal       int64        `json:"diskTotal"`
 	MemCurrent      int64        `json:"memCurrent"`
