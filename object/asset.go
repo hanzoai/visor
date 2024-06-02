@@ -82,6 +82,7 @@ type Asset struct {
 	Services        []*Service   `json:"services"`
 	GatewayPort     int          `json:"gatewayPort"`
 	EnableSsh       bool         `json:"enableSsh"`
+	SshPort         int          `json:"sshPort"`
 	Status          string       `xorm:"varchar(20)" json:"status"`
 	DiskCurrent     int64        `json:"diskCurrent"`
 	DiskTotal       int64        `json:"diskTotal"`
@@ -255,6 +256,8 @@ func (asset *Asset) GetAddr() string {
 	var addr string
 	if asset.GatewayPort != 0 {
 		addr = fmt.Sprintf("%s:%d", conf.GatewayAddr.IP, asset.GatewayPort)
+	} else if asset.EnableSsh {
+		addr = fmt.Sprintf("%s:%d", asset.Endpoint, asset.SshPort)
 	} else {
 		addr = fmt.Sprintf("%s:%d", asset.Endpoint, asset.Port)
 	}

@@ -39,7 +39,7 @@ func GetStorageProvider(typ string, clientId string, providerName string) (Stora
 	switch typ {
 	case "local_file_system":
 		p, err = NewLocalFileSystemStorageProvider(providerName)
-	case "SSH":
+	case "SSH", "RDP":
 		p, err = NewSftpProvider(clientId)
 	}
 

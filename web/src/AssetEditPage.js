@@ -341,19 +341,38 @@ class AssetEditPage extends React.Component {
             }} />
           </Col>
         </Row>
-        {asset.category === "Machine" && asset.type !== "SSH" && (
-          <Row style={{marginTop: "20px"}} >
-            <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
-              {Setting.getLabel(i18next.t("asset:Enable SSH"), i18next.t("asset:Enable SSH - Tooltip"))} :
-            </Col>
-            <Col span={22} >
-              <Switch checked={asset.enableSsh} onChange={checked => {
-                this.updateAssetField("enableSsh", checked);
-              }
-              } />
-            </Col>
-          </Row>
-        )}
+        {
+          asset.category === "Machine" && asset.type !== "SSH" && (
+            <Row style={{marginTop: "20px"}} >
+              <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+                {Setting.getLabel(i18next.t("asset:Enable SSH"), i18next.t("asset:Enable SSH - Tooltip"))} :
+              </Col>
+              <Col span={22} >
+                <Switch checked={asset.enableSsh} onChange={checked => {
+                  this.updateAssetField("enableSsh", checked);
+                  if (checked) {
+                    this.updateAssetField("sshPort", 22);
+                  }
+                }}
+                />
+              </Col>
+            </Row>
+          )
+        }
+        {
+          asset.enableSsh && (
+            <Row style={{marginTop: "20px"}} >
+              <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+                {Setting.getLabel(i18next.t("general:SSH Port"), i18next.t("general:SSH Port - Tooltip"))} :
+              </Col>
+              <Col span={22} >
+                <Input value={asset.sshPort} onChange={e => {
+                  this.updateAssetField("sshPort", e.target.value);
+                }} />
+              </Col>
+            </Row>
+          )
+        }
         <Row style={{marginTop: "20px"}}>
           <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
             {Setting.getLabel(i18next.t("asset:OS"), i18next.t("asset:OS - Tooltip"))} :

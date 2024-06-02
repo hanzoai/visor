@@ -313,7 +313,7 @@ class AssetListPage extends BaseListPage {
         key: "status",
         width: "100px",
         render: (text, record, index) => {
-          if (record.category !== "Machine" || record.status === "") {
+          if (record.category !== "Machine" || (record.type === "RDP" && !record.enableSsh)) {
             return "";
           }
           return <Tag color={text === AssetStatusRunning ? "green" : "red"}>{text}</Tag>;
@@ -325,7 +325,7 @@ class AssetListPage extends BaseListPage {
         key: "cpuCurrent",
         width: "150px",
         render: (text, record, index) => {
-          if (record.status !== AssetStatusRunning) {
+          if (record.status !== AssetStatusRunning || record.cpuTotal === 0) {
             return "";
           }
 
@@ -340,7 +340,7 @@ class AssetListPage extends BaseListPage {
         key: "memory",
         width: "150px",
         render: (text, record, index) => {
-          if (record.status !== AssetStatusRunning) {
+          if (record.status !== AssetStatusRunning || record.memTotal === 0) {
             return "";
           }
 
@@ -355,7 +355,7 @@ class AssetListPage extends BaseListPage {
         key: "disk",
         width: "150px",
         render: (text, record, index) => {
-          if (record.status !== AssetStatusRunning) {
+          if (record.status !== AssetStatusRunning || record.diskTotal === 0) {
             return "";
           }
 
@@ -368,13 +368,13 @@ class AssetListPage extends BaseListPage {
         title: i18next.t("general:Action"),
         dataIndex: "action",
         key: "action",
-        width: "300px",
+        width: "320px",
         fixed: (Setting.isMobile()) ? "false" : "right",
         render: (text, record, index) => {
           return (
             <div>
               <Button
-                disabled={!Setting.isAdminUser(this.props.account) && (record.owner !== this.props.account.owner) || record.status === AssetStatusStopped}
+                disabled={!Setting.isAdminUser(this.props.account) && (record.owner !== this.props.account.owner)}
                 style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}}
                 type="primary"
                 onClick={() => {
