@@ -195,7 +195,7 @@ func CreateSession(session *Session, assetId, mode string) (*Session, error) {
 	}
 
 	if mode == "file" {
-		terminal, err := term.NewTerminal(asset.GetAddr(), asset.Username, asset.Password)
+		terminal, err := term.NewTerminal(asset.GetSshAddr(), asset.Username, asset.Password)
 		if err != nil {
 			return nil, err
 		}

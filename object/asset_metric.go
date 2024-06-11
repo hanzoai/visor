@@ -50,15 +50,8 @@ func RunUpdateAssetMetrics() {
 func UpdateAssetMetric(asset *Asset) error {
 	client, err := GetSshClient(asset)
 	if err != nil {
-		asset.Status = AssetStatusStopped
-		_, updateErr := adapter.Engine.ID(core.PK{asset.Owner, asset.Name}).AllCols().Update(asset)
-		if updateErr != nil {
-			return updateErr
-		}
 		return fmt.Errorf("%s: %s", asset.GetId(), err.Error())
 	}
-
-	asset.Status = AssetStatusRunning
 
 	stat := &metric.Stat{}
 	stat, err = metric.GetAllStat(client, stat)
@@ -67,7 +60,7 @@ func UpdateAssetMetric(asset *Asset) error {
 	}
 
 	LoadAssetStat(asset, stat)
-	_, err = adapter.Engine.ID(core.PK{asset.Owner, asset.Name}).AllCols().Update(asset)
+	_, err = adapter.Engine.ID(core.PK{asset.Owner, asset.Name}).Cols("disk_total", "disk_current", "mem_total", "mem_current", "cpu_total", "cpu_current").Update(asset)
 	if err != nil {
 		return err
 	}
@@ -86,7 +79,7 @@ func GetSshClient(asset *Asset) (*ssh.Client, error) {
 	sshClientsMutex.Lock()
 	defer sshClientsMutex.Unlock()
 
-	client, err := term.NewSshClient(asset.GetAddr(), asset.Username, asset.Password)
+	client, err := term.NewSshClient(asset.GetSshAddr(), asset.Username, asset.Password)
 	if err != nil {
 		return nil, err
 	}

@@ -145,7 +145,7 @@ func (c *ApiController) GetAssetTunnel() {
 	}
 
 	if asset.Type == "SSH" {
-		terminal, err := term.NewTerminal(asset.GetAddr(), asset.Username, asset.Password)
+		terminal, err := term.NewTerminal(asset.GetSshAddr(), asset.Username, asset.Password)
 		if err != nil {
 			guacamole.Disconnect(ws, NewSshClientError, "failed to creat SSH client: "+err.Error())
 			return

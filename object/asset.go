@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/casvisor/casvisor/conf"
 	"github.com/casvisor/casvisor/dbgate"
 	"github.com/casvisor/casvisor/util"
 	"xorm.io/core"
@@ -84,6 +83,7 @@ type Asset struct {
 	EnableSsh       bool         `json:"enableSsh"`
 	SshPort         int          `json:"sshPort"`
 	Status          string       `xorm:"varchar(20)" json:"status"`
+	SshStatus       string       `xorm:"varchar(20)" json:"sshStatus"`
 	DiskCurrent     int64        `json:"diskCurrent"`
 	DiskTotal       int64        `json:"diskTotal"`
 	MemCurrent      int64        `json:"memCurrent"`
@@ -200,6 +200,10 @@ func UpdateAsset(id string, asset *Asset) (bool, error) {
 		asset.Password = oldAsset.Password
 	}
 
+	if !asset.EnableSsh && asset.Type != "SSH" && (asset.SshStatus == AssetStatusRunning) {
+		asset.SshStatus = AssetStatusStopped
+	}
+
 	affected, err := adapter.Engine.ID(core.PK{owner, name}).AllCols().Update(asset)
 	if err != nil {
 		return false, err
@@ -248,20 +252,19 @@ func (asset *Asset) GetId() string {
 	return fmt.Sprintf("%s/%s", asset.Owner, asset.Name)
 }
 
-func (asset *Asset) GetAddr() string {
+func (asset *Asset) GetSshAddr() string {
 	if asset == nil {
 		return ""
 	}
 
-	var addr string
-	if asset.GatewayPort != 0 {
-		addr = fmt.Sprintf("%s:%d", conf.GatewayAddr.IP, asset.GatewayPort)
-	} else if asset.EnableSsh {
-		addr = fmt.Sprintf("%s:%d", asset.Endpoint, asset.SshPort)
-	} else {
-		addr = fmt.Sprintf("%s:%d", asset.Endpoint, asset.Port)
+	if asset.Type == "SSH" {
+		return fmt.Sprintf("%s:%d", asset.Endpoint, asset.Port)
 	}
-	return addr
+
+	if asset.EnableSsh {
+		return fmt.Sprintf("%s:%d", asset.Endpoint, asset.SshPort)
+	}
+	return ""
 }
 
 func GetAssetsByName(owner, name string, isAdmin bool) ([]*Asset, error) {

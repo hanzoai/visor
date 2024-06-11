@@ -12,37 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package object
+package controllers
 
-import (
-	"fmt"
-	"net"
-	"net/url"
-	"strings"
-	"time"
-)
+import "github.com/casvisor/casvisor/object"
 
-func getUrlFromPath(path string, origin string) (string, error) {
-	if strings.HasPrefix(path, "http") {
-		return path, nil
-	}
-
-	if strings.HasPrefix(path, "/api/get-file") {
-		res, err := url.JoinPath(origin, path)
-		return res, err
-	}
-
-	res := strings.Replace(path, ":", "|", 1)
-	res = fmt.Sprintf("storage/%s", res)
-	res, err := url.JoinPath(origin, res)
-	return res, err
-}
-
-func isPortOpen(host string, port int) bool {
-	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", host, port), 5*time.Second)
+func (c *ApiController) RefreshAssetStatus() {
+	err := object.RunRefreshAssetStatus()
 	if err != nil {
-		return false
+		c.ResponseError(err.Error())
 	}
-	defer conn.Close()
-	return true
+	c.ResponseOk()
 }
