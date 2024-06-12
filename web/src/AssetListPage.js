@@ -22,6 +22,7 @@ import * as AssetBackend from "./backend/AssetBackend";
 import i18next from "i18next";
 import PopconfirmModal from "./common/modal/PopconfirmModal";
 import {UploadOutlined} from "@ant-design/icons";
+import ConnectModal from "./common/modal/ConnectModal";
 
 const AssetStatusRunning = "Running";
 const AssetStatusStopped = "Stopped";
@@ -373,22 +374,12 @@ class AssetListPage extends BaseListPage {
         render: (text, record, index) => {
           return (
             <div>
-              <Button
+              <ConnectModal
                 disabled={!Setting.isAdminUser(this.props.account) && (record.owner !== this.props.account.owner) || record.status === AssetStatusStopped}
-                style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}}
-                type="primary"
-                onClick={() => {
-                  if (record.category === "Machine") {
-                    const link = `access/${record.owner}/${record.name}`;
-                    Setting.openLink(link);
-                  } else if (record.category === "Database") {
-                    const link = "databases";
-                    Setting.openLink(link);
-                  }
-                }}
-              >
-                {i18next.t("general:Connect")}
-              </Button>
+                owner = {record.owner}
+                name = {record.name}
+                category = {record.category}
+              />
               {
                 record.category === "Machine" &&
                 <Button
