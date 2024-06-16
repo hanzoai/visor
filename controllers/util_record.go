@@ -17,16 +17,24 @@ package controllers
 import (
 	"fmt"
 
+	"github.com/casvisor/casvisor/conf"
 	"github.com/casvisor/casvisor/object"
 	"github.com/casvisor/casvisor/util"
 )
 
 func addRecord(c *ApiController, userName string, requestUri string) {
-	record := object.NewRecord(c.Ctx)
+	record, err := object.NewRecord(c.Ctx)
+	if err != nil {
+		fmt.Printf("addRecord() error: %s\n", err.Error())
+		return
+	}
+
 	record.User = userName
 	if requestUri != "" {
 		record.RequestUri = requestUri
 	}
+
+	record.Organization = conf.GetConfigString("casdoorOrganization")
 
 	util.SafeGoroutine(func() {
 		_, err := object.AddRecord(record)
@@ -36,19 +44,19 @@ func addRecord(c *ApiController, userName string, requestUri string) {
 	})
 }
 
-func addRecordForFile(c *ApiController, userName string, action string, storeId string, key string, filename string, isLeaf bool) {
+func addRecordForFile(c *ApiController, userName string, action string, sessionId string, key string, filename string, isLeaf bool) {
 	typ := "Folder"
 	if isLeaf {
 		typ = "File"
 	}
 
-	_, storeName := util.GetOwnerAndNameFromId(storeId)
+	_, storeName := util.GetOwnerAndNameFromId(sessionId)
 
 	path := fmt.Sprintf("/%s/%s", key, filename)
 	if filename == "" {
 		path = key
 	}
 
-	text := fmt.Sprintf("%s%s, Store: %s, Path: %s", action, typ, storeName, path)
+	text := fmt.Sprintf("%s%s, Session: %s, Path: %s", action, typ, storeName, path)
 	addRecord(c, userName, text)
 }

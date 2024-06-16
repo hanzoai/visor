@@ -50,43 +50,6 @@ class AssetListPage extends BaseListPage {
     clearInterval(this.assetStatusTimer);
   }
 
-  fetchAssets = (params = {}) => {
-    let field = params.searchedColumn, value = params.searchText;
-    const sortField = params.sortField, sortOrder = params.sortOrder;
-    if (params.category) {
-      field = "category";
-      value = params.category;
-    } else if (params.type) {
-      field = "type";
-      value = params.type;
-    }
-
-    return AssetBackend.getAssets(
-      Setting.getRequestOrganization(this.props.account),
-      params.pagination.current,
-      params.pagination.pageSize,
-      field,
-      value,
-      sortField,
-      sortOrder
-    )
-      .then((res) => {
-        if (res.status === "ok") {
-          return {
-            data: res.data,
-            total: res.data2,
-          };
-        } else {
-          if (Setting.isResponseDenied(res)) {
-            this.setState({isAuthorized: false});
-          } else {
-            Setting.showMessage("error", res.msg);
-            throw new Error(res.msg);
-          }
-        }
-      });
-  };
-
   newAsset() {
     return {
       owner: this.props.account.owner,
@@ -453,7 +416,7 @@ class AssetListPage extends BaseListPage {
     if (!silent) {
       this.setState({loading: true});
     }
-    AssetBackend.getAssets(Setting.getRequestOrganization(this.props.account), params.pagination.current, params.pagination.pageSize, field, value, sortField, sortOrder)
+    AssetBackend.getAssets(Setting.getRequestOrganization(this.props.account), params.pagination.current, params.pagination.pageSize, field, value, sortField, sortOrder, silent)
       .then((res) => {
         if (!silent) {
           this.setState({loading: false});

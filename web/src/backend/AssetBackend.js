@@ -14,8 +14,8 @@
 
 import * as Setting from "../Setting";
 
-export function getAssets(owner, page = "", pageSize = "", field = "", value = "", sortField = "", sortOrder = "") {
-  return fetch(`${Setting.ServerUrl}/api/get-assets?owner=${owner}&p=${page}&pageSize=${pageSize}&field=${field}&value=${value}&sortField=${sortField}&sortOrder=${sortOrder}`, {
+export function getAssets(owner, page = "", pageSize = "", field = "", value = "", sortField = "", sortOrder = "", silent = false) {
+  return fetch(`${Setting.ServerUrl}/api/get-assets?owner=${owner}&p=${page}&pageSize=${pageSize}&field=${field}&value=${value}&sortField=${sortField}&sortOrder=${sortOrder}&silent=${silent}`, {
     method: "GET",
     credentials: "include",
   }).then(res => res.json());
