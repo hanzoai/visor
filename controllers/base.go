@@ -26,6 +26,10 @@ type ApiController struct {
 	beego.Controller
 }
 
+type RootController struct {
+	ApiController
+}
+
 func init() {
 	gob.Register(casdoorsdk.Claims{})
 }

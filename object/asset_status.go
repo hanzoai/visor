@@ -15,7 +15,9 @@
 package object
 
 import (
+	"github.com/casvisor/casvisor/conf"
 	"github.com/casvisor/casvisor/metric"
+	"github.com/casvisor/casvisor/util"
 	"xorm.io/core"
 )
 
@@ -42,6 +44,7 @@ func RefreshAssetStatus(asset *Asset) error {
 	var err error
 	var status string
 	var sshStatus string
+	var agentStatus string
 
 	portOpen := isPortOpen(asset.Endpoint, asset.Port)
 	if portOpen {
@@ -64,10 +67,18 @@ func RefreshAssetStatus(asset *Asset) error {
 		}
 	}
 
+	portOpen = isPortOpen(asset.Endpoint, util.ParseInt(conf.GetConfigString("httpport")))
+	if portOpen {
+		agentStatus = AssetStatusRunning
+	} else {
+		agentStatus = AssetStatusStopped
+	}
+
 	asset.Status = status
 	asset.SshStatus = sshStatus
+	asset.AgentStatus = agentStatus
 
-	_, err = adapter.Engine.ID(core.PK{asset.Owner, asset.Name}).Cols("status", "ssh_status").Update(asset)
+	_, err = adapter.Engine.ID(core.PK{asset.Owner, asset.Name}).Cols("status", "ssh_status", "agent_status").Update(asset)
 	if err != nil {
 		return err
 	}

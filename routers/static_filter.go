@@ -47,7 +47,7 @@ var (
 
 func TransparentStatic(ctx *context.Context) {
 	urlPath := ctx.Request.URL.Path
-	if strings.HasPrefix(urlPath, "/api/") || strings.HasPrefix(urlPath, "/dbgate") {
+	if strings.HasPrefix(urlPath, "/api/") || strings.HasPrefix(urlPath, "/dbgate") || strings.HasPrefix(urlPath, "/agent") {
 		return
 	}
 

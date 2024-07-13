@@ -24,9 +24,16 @@ func init() {
 }
 
 func initAPI() {
-	ns := beego.NewNamespace("/api",
-		beego.NSInclude(
-			&controllers.ApiController{},
+	ns := beego.NewNamespace("/",
+		beego.NSNamespace("/api",
+			beego.NSInclude(
+				&controllers.ApiController{},
+			),
+		),
+		beego.NSNamespace("",
+			beego.NSInclude(
+				&controllers.RootController{},
+			),
 		),
 	)
 	beego.AddNamespace(ns)
@@ -78,4 +85,6 @@ func initAPI() {
 	beego.Router("/api/update-permission", &controllers.ApiController{}, "POST:UpdatePermission")
 	beego.Router("/api/add-permission", &controllers.ApiController{}, "POST:AddPermission")
 	beego.Router("/api/delete-permission", &controllers.ApiController{}, "POST:DeletePermission")
+
+	beego.Router("/agent/get-system-info", &controllers.RootController{}, "GET:GetSystemInfo")
 }

@@ -48,6 +48,9 @@ func updateAssetMetrics() {
 		isUpdateInProgressMutex.Unlock()
 	}()
 
+	updateTicker := time.NewTicker(1 * time.Second)
+	defer updateTicker.Stop()
+
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -72,7 +75,7 @@ func updateAssetMetrics() {
 		case <-ctx.Done():
 			object.CloseSshClients()
 			return
-		default:
+		case <-updateTicker.C:
 			object.RunUpdateAssetMetrics()
 		}
 	}

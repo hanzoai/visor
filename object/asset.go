@@ -84,6 +84,7 @@ type Asset struct {
 	SshPort         int          `json:"sshPort"`
 	Status          string       `xorm:"varchar(20)" json:"status"`
 	SshStatus       string       `xorm:"varchar(20)" json:"sshStatus"`
+	AgentStatus     string       `xorm:"varchar(20)" json:"agentStatus"`
 	DiskCurrent     int64        `json:"diskCurrent"`
 	DiskTotal       int64        `json:"diskTotal"`
 	MemCurrent      int64        `json:"memCurrent"`

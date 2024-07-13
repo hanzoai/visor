@@ -15,9 +15,15 @@
 package object
 
 import (
+	"encoding/json"
 	"fmt"
+	"net"
+	"net/http"
 	"sync"
+	"time"
 
+	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
+	"github.com/casvisor/casvisor/conf"
 	"github.com/casvisor/casvisor/metric"
 	"github.com/casvisor/casvisor/util/term"
 	"golang.org/x/crypto/ssh"
@@ -27,11 +33,16 @@ import (
 var (
 	sshClients      sync.Map
 	sshClientsMutex sync.RWMutex
+	httpClient      *http.Client
 )
+
+func init() {
+	httpClient = newHTTPClient()
+}
 
 func RunUpdateAssetMetrics() {
 	assets := []*Asset{}
-	err := adapter.Engine.Where("enable_ssh = ? or type = ?", true, "SSH").Find(&assets)
+	err := adapter.Engine.Where("ssh_status = ? or agent_status = ? ", AssetStatusRunning, AssetStatusRunning).Find(&assets)
 	if err != nil {
 		return
 	}
@@ -48,19 +59,33 @@ func RunUpdateAssetMetrics() {
 }
 
 func UpdateAssetMetric(asset *Asset) error {
-	client, err := GetSshClient(asset)
-	if err != nil {
-		return fmt.Errorf("%s: %s", asset.GetId(), err.Error())
-	}
+	if asset.AgentStatus == AssetStatusRunning {
+		systemInfo, err := getMetrics(asset)
+		if err != nil {
+			return err
+		}
 
-	stat := &metric.Stat{}
-	stat, err = metric.GetAllStat(client, stat)
-	if err != nil {
-		return err
-	}
+		asset.DiskTotal = int64(systemInfo.DiskTotal)
+		asset.DiskCurrent = int64(systemInfo.DiskUsed)
+		asset.MemTotal = int64(systemInfo.MemoryTotal)
+		asset.MemCurrent = int64(systemInfo.MemoryUsed)
+		asset.CpuTotal = len(systemInfo.CpuUsage)
+		asset.CpuCurrent = float32(systemInfo.CpuUsage[0])
+	} else if asset.SshStatus == AssetStatusRunning {
+		client, err := GetSshClient(asset)
+		if err != nil {
+			return fmt.Errorf("%s: %s", asset.GetId(), err.Error())
+		}
 
-	LoadAssetStat(asset, stat)
-	_, err = adapter.Engine.ID(core.PK{asset.Owner, asset.Name}).Cols("disk_total", "disk_current", "mem_total", "mem_current", "cpu_total", "cpu_current").Update(asset)
+		stat := &metric.Stat{}
+		stat, err = metric.GetAllStat(client, stat)
+		if err != nil {
+			return err
+		}
+
+		LoadAssetStat(asset, stat)
+	}
+	_, err := adapter.Engine.ID(core.PK{asset.Owner, asset.Name}).Cols("disk_total", "disk_current", "mem_total", "mem_current", "cpu_total", "cpu_current").Update(asset)
 	if err != nil {
 		return err
 	}
@@ -113,4 +138,39 @@ func CloseSshClients() {
 	})
 
 	metric.CleanupPreCpuMap()
+}
+
+func newHTTPClient() *http.Client {
+	transport := &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     90 * time.Second,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+	}
+
+	return &http.Client{
+		Transport: transport,
+		Timeout:   60 * time.Second,
+	}
+}
+
+func getMetrics(asset *Asset) (*SystemInfo, error) {
+	url := fmt.Sprintf("http://%s:%s/agent/get-system-info", asset.Endpoint, conf.GetConfigString("httpport"))
+
+	casdoorsdk.SetHttpClient(httpClient)
+	res, err := casdoorsdk.DoGetBytes(url)
+	if err != nil {
+		return nil, err
+	}
+
+	var systemInfo *SystemInfo
+	err = json.Unmarshal(res, &systemInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	return systemInfo, nil
 }
