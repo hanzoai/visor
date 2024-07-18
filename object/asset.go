@@ -285,17 +285,6 @@ func (asset *Asset) GetSshAddr() string {
 	return ""
 }
 
-func GetAssetsByName(owner, name string, isAdmin bool) ([]*Asset, error) {
-	if isAdmin {
-		return GetAssets(owner)
-	}
-
-	assets := []*Asset{}
-	// TODO get asset by call enforcer API
-
-	return assets, nil
-}
-
 func (asset *Asset) toConnection() *dbgate.Connection {
 	connection := &dbgate.Connection{
 		Id:              asset.Id,
