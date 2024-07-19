@@ -139,13 +139,13 @@ class CommandListPage extends BaseListPage {
           return (
             <div>
               <Button
-                disabled={!Setting.isAdminUser(this.props.account) && (record.owner !== this.props.account.owner)}
+                disabled={record.owner !== this.props.account.owner}
                 style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}}
                 onClick={() => this.props.history.push(`/commands/${record.owner}/${record.name}`)}
               >{i18next.t("general:Edit")}
               </Button>
               <PopconfirmModal
-                disabled={!Setting.isAdminUser(this.props.account) && (record.owner !== this.props.account.owner)}
+                disabled={record.owner !== this.props.account.owner}
                 title={i18next.t("general:Sure to delete") + `: ${record.name} ?`}
                 onConfirm={() => this.deleteCommand(index)}
               >
@@ -170,7 +170,7 @@ class CommandListPage extends BaseListPage {
           title={() => (
             <div>
               {i18next.t("general:Commands")}&nbsp;&nbsp;&nbsp;&nbsp;
-              <Button type="primary" size="small" disabled={!Setting.isAdminUser(this.props.account)} onClick={this.addCommand.bind(this)}>{i18next.t("general:Add")}</Button>
+              <Button type="primary" size="small" onClick={this.addCommand.bind(this)}>{i18next.t("general:Add")}</Button>
             </div>
           )}
           loading={this.state.loading}

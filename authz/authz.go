@@ -117,7 +117,7 @@ func IsAllowed(user *casdoorsdk.User, subOwner string, subName string, method st
 			return false
 		}
 
-		if user.IsAdmin && (subOwner == objOwner || (objOwner == "admin")) {
+		if subOwner == objOwner || (objOwner == "admin") {
 			return true
 		}
 	}

@@ -338,7 +338,7 @@ class AssetListPage extends BaseListPage {
           return (
             <div>
               <ConnectModal
-                disabled={!Setting.isAdminUser(this.props.account) && (record.owner !== this.props.account.owner) || record.status === AssetStatusStopped}
+                disabled={record.owner !== this.props.account.owner || record.status === AssetStatusStopped}
                 owner = {record.owner}
                 name = {record.name}
                 category = {record.category}
@@ -358,13 +358,13 @@ class AssetListPage extends BaseListPage {
                 </Button>
               }
               <Button
-                disabled={!Setting.isAdminUser(this.props.account) && (record.owner !== this.props.account.owner)}
+                disabled={record.owner !== this.props.account.owner}
                 style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}}
                 onClick={() => this.props.history.push(`/assets/${record.owner}/${record.name}`)}
               >{i18next.t("general:Edit")}
               </Button>
               <PopconfirmModal
-                disabled={!Setting.isAdminUser(this.props.account) && (record.owner !== this.props.account.owner)}
+                disabled={record.owner !== this.props.account.owner}
                 title={i18next.t("general:Sure to delete") + `: ${record.name} ?`}
                 onConfirm={() => this.deleteAsset(index)}
               >
@@ -389,7 +389,7 @@ class AssetListPage extends BaseListPage {
           title={() => (
             <div>
               {i18next.t("general:Assets")}&nbsp;&nbsp;&nbsp;&nbsp;
-              <Button type="primary" size="small" disabled={!Setting.isAdminUser(this.props.account)} onClick={this.addAsset.bind(this)}>{i18next.t("general:Add")}</Button>
+              <Button type="primary" size="small" onClick={this.addAsset.bind(this)}>{i18next.t("general:Add")}</Button>
               &nbsp;&nbsp;
               {
                 this.renderUpload()
