@@ -99,8 +99,8 @@ func (c *ApiController) GetAssetTunnel() {
 	dpi := c.Input().Get("dpi")
 	sessionId := c.Input().Get("sessionId")
 
-	username := c.Input().Get("username")
-	password := c.Input().Get("password")
+	username := util.QueryUnescape(c.Input().Get("username"))
+	password := util.QueryUnescape(c.Input().Get("password"))
 
 	intWidth, err := strconv.Atoi(width)
 	if err != nil {

@@ -14,7 +14,10 @@
 
 package util
 
-import "os"
+import (
+	"net/url"
+	"os"
+)
 
 var hostname = ""
 
@@ -29,4 +32,13 @@ func init() {
 
 func GetHostname() string {
 	return hostname
+}
+
+func QueryUnescape(s string) string {
+	res, err := url.QueryUnescape(s)
+	if err != nil {
+		return ""
+	}
+
+	return res
 }
