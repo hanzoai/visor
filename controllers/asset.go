@@ -209,11 +209,6 @@ func (c *ApiController) DetectAssets() {
 // @Success 200 {object} object.Asset The Response object
 // @router /get-detected-assets [get]
 func (c *ApiController) GetDetectedAssets() {
-	_, ok := c.RequireAdmin()
-	if !ok {
-		//
-		return
-	}
 	owner := c.Input().Get("owner")
 	limit := c.Input().Get("pageSize")
 	page := c.Input().Get("p")
@@ -259,11 +254,6 @@ func (c *ApiController) GetDetectedAssets() {
 // @Param   name     query    string  true        "The name of the detected asset"
 // @router /add-detected-asset [post]
 func (c *ApiController) AddDetectedAsset() {
-	_, ok := c.RequireAdmin()
-	if !ok {
-		//
-		return
-	}
 	owner := c.Input().Get("owner")
 	name := c.Input().Get("name")
 	asset, err := object.GetDetectedAssetByOwnerAndName(owner, name)
