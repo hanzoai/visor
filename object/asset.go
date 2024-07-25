@@ -102,6 +102,38 @@ type Asset struct {
 	IsReadOnly      bool         `json:"isReadOnly"`
 }
 
+func CreateAssetByIPAndPort(IP string, port int) (*Asset, error) {
+	assetCnt, err := GetAssetCount("casbin", "", "")
+	if err != nil {
+		return nil, err
+	}
+	asset := Asset{
+		Owner:       "casbin",
+		Name:        IP + ":" + strconv.Itoa(port),
+		CreatedTime: util.GetCurrentTime(),
+		DisplayName: "New Machine - " + fmt.Sprintf("%d", assetCnt),
+		Category:    "Machine",
+		Language:    "zh",
+		AutoQuery:   false,
+		IsPermanent: true,
+		RemoteApps:  []*RemoteApp{},
+		Services:    []*Service{},
+	}
+	asset.Endpoint = IP
+	asset.Port = port
+	if port == 22 {
+		asset.Type = "SSH"
+		asset.Os = "Linux"
+	} else if port == 3389 {
+		asset.Type = "RDP"
+		asset.Os = "Windows"
+	} else {
+		asset.Type = ""
+		asset.Os = ""
+	}
+	return &asset, nil
+}
+
 func GetAssetCount(owner, field, value string) (int64, error) {
 	session := GetSession(owner, -1, -1, field, value, "", "")
 	return session.Count(&Asset{})
@@ -249,6 +281,68 @@ func AddAsset(asset *Asset) (bool, error) {
 		return false, err
 	}
 
+	return affected != 0, nil
+}
+
+func GetDetectedAssets(owner string) ([]*Asset, error) {
+	assets := []*Asset{}
+	err := adapter.Engine.Table("DetectedAsset").Desc("created_time").Find(&assets, &Asset{Owner: owner})
+	if err != nil {
+		return assets, err
+	}
+
+	return assets, nil
+}
+
+func GetDetectedPaginationAssets(owner string, offset, limit int, field, value, sortField, sortOrder string) ([]*Asset, error) {
+	assets := []*Asset{}
+	session := GetSession(owner, offset, limit, field, value, sortField, sortOrder)
+	err := session.Table("DetectedAsset").Find(&assets)
+	if err != nil {
+		return assets, err
+	}
+
+	return assets, nil
+}
+
+func GetDetectedAssetByOwnerAndName(owner, name string) (*Asset, error) {
+	var asset Asset
+	affected, err := adapter.Engine.Table("DetectedAsset").Where("owner = ? AND name = ?", owner, name).Get(&asset)
+	if err != nil {
+		return nil, err
+	}
+	if !affected {
+		return nil, nil
+	}
+	return &asset, nil
+}
+
+func AddDetectedAsset(asset *Asset) (bool, error) {
+	if asset.Id == "" {
+		asset.Id = util.GenerateId()
+	}
+	affected, err := adapter.Engine.Table("DetectedAsset").Insert(asset)
+	if err != nil {
+		return false, err
+	}
+
+	err = AssetHook(asset, nil, "insert")
+	if err != nil {
+		return false, err
+	}
+
+	return affected != 0, nil
+}
+
+func DeleteDetectedAssets() (bool, error) {
+	result, err := adapter.Engine.Exec("DELETE FROM DetectedAsset")
+	if err != nil {
+		return false, err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
 	return affected != 0, nil
 }
 

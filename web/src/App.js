@@ -28,6 +28,7 @@ import {withTranslation} from "react-i18next";
 import LanguageSelect from "./LanguageSelect";
 import AssetListPage from "./AssetListPage";
 import AssetEditPage from "./AssetEditPage";
+import AssetDetectPage from "./AssetDetectPage";
 import SessionListPage from "./SessionListPage";
 import RecordListPage from "./RecordListPage";
 import RecordEditPage from "./RecordEditPage";
@@ -241,6 +242,7 @@ class App extends Component {
         <Route exact path="/assets" render={(props) => this.renderSigninIfNotSignedIn(<AssetListPage account={this.state.account} {...props} />)} />
         <Route exact path="/assets/:organizationName/:assetName" render={(props) => this.renderSigninIfNotSignedIn(<AssetEditPage account={this.state.account} {...props} />)} />
         <Route exact path="/assets/:organizationName/:assetName/view" render={(props) => this.renderSigninIfNotSignedIn(<FileTreePage account={this.state.account} {...props} />)} />
+        <Route exact path="/assets/detect" render={(props) => this.renderSigninIfNotSignedIn(<AssetDetectPage account={this.state.account} {...props} />)} />
         <Route exact path="/databases" render={(props) => this.renderSigninIfNotSignedIn(<DatabasesPage account={this.state.account} {...props} />)} />
         <Route exact path="/sessions" render={(props) => this.renderSigninIfNotSignedIn(<SessionListPage account={this.state.account} {...props} />)} />
         <Route exact path="/records" render={(props) => this.renderSigninIfNotSignedIn(<RecordListPage account={this.state.account} {...props} />)} />

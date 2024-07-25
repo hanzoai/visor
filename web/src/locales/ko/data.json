@@ -9,8 +9,11 @@
     "Is Permanent - Tooltip": "영구적입니다 - 툴팁"
   },
   "asset": {
+    "Asset detection is complete.": "자산 감지가 완료되었습니다.",
     "CPU": "CPU",
     "Cannot enable Remote App when Remote Apps are empty. Please add at least one Remote App in below table first, then enable again": "원격 앱이 비어 있을 때 원격 앱을 활성화할 수 없습니다. 먼저 아래 표에 최소한 하나의 원격 앱을 추가한 후 다시 활성화하세요",
+    "Detecting Assets...Please wait.": "자산 감지 중입니다... 잠시 기다려주세요.",
+    "Detection Complete": "감지 완료",
     "Disk": "디스크",
     "Download RDP file": "RDP 파일 다운로드",
     "Edit Asset": "자산 편집",
@@ -58,6 +61,7 @@
     "Back Home": "홈으로 돌아가기",
     "Cancel": "취소",
     "Category": "카테고리",
+    "Choose": "고르다",
     "Client IP": "클라이언트 IP",
     "Client IP - Tooltip": "클라이언트 IP - 툴팁",
     "Close": "닫기",
@@ -71,6 +75,7 @@
     "Database type": "데이터베이스 유형",
     "Database type - Tooltip": "데이터베이스 유형 - 툴팁",
     "Delete": "삭제",
+    "Detect": "탐지하다",
     "Display name": "표시 이름",
     "Display name - Tooltip": "표시 이름 - 툴팁",
     "DisplayName - Category": "표시 이름 - 카테고리",

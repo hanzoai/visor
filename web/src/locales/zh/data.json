@@ -9,8 +9,11 @@
     "Is Permanent - Tooltip": "是否永久 - 工具提示"
   },
   "asset": {
+    "Asset detection is complete.": "资产检测完成。",
     "CPU": "CPU",
     "Cannot enable Remote App when Remote Apps are empty. Please add at least one Remote App in below table first, then enable again": "当远程应用为空时不能启用远程应用。请先在下表中添加至少一个远程应用，然后再次启用",
+    "Detecting Assets...Please wait.": "正在检测资产... 请稍候。",
+    "Detection Complete": "检测完成。",
     "Disk": "磁盘",
     "Download RDP file": "下载RDP文件",
     "Edit Asset": "编辑资产",
@@ -58,6 +61,7 @@
     "Back Home": "返回首页",
     "Cancel": "取消",
     "Category": "分类",
+    "Choose": "选择",
     "Client IP": "客户端IP",
     "Client IP - Tooltip": "客户端IP - 工具提示",
     "Close": "关闭",
@@ -71,6 +75,7 @@
     "Database type": "数据库类型",
     "Database type - Tooltip": "数据库类型 - 工具提示",
     "Delete": "删除",
+    "Detect": "探测",
     "Display name": "显示名称",
     "Display name - Tooltip": "显示名称 - 工具提示",
     "DisplayName - Category": "显示名称 - 分类",

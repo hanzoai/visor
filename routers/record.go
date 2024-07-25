@@ -27,7 +27,7 @@ func RecordMessage(ctx *context.Context) {
 		return
 	}
 
-	if ctx.Request.URL.Path == "/api/refresh-asset-status" || (ctx.Request.URL.Path == "/api/get-assets" && ctx.Input.Params()["silent"] == "true") {
+	if ctx.Request.URL.Path == "/api/refresh-asset-status" || (ctx.Request.URL.Path == "/api/get-assets" && ctx.Input.Params()["silent"] == "true" || ctx.Request.URL.Path == "/api/delete-detected-assets") {
 		return
 	}
 

@@ -9,8 +9,11 @@
     "Is Permanent - Tooltip": "永続的です - ツールチップ"
   },
   "asset": {
+    "Asset detection is complete.": "資産の検出が完了しました。",
     "CPU": "CPU",
     "Cannot enable Remote App when Remote Apps are empty. Please add at least one Remote App in below table first, then enable again": "リモートアプリが空の場合、リモートアプリを有効にすることはできません。まず下の表に少なくとも1つのリモートアプリを追加してから、再度有効にしてください。",
+    "Detecting Assets...Please wait.": "資産を検出中です...しばらくお待ちください。",
+    "Detection Complete": "検出が完了しました。",
     "Disk": "ディスク",
     "Download RDP file": "RDPファイルをダウンロード",
     "Edit Asset": "資産を編集",
@@ -58,6 +61,7 @@
     "Back Home": "ホームに戻る",
     "Cancel": "キャンセル",
     "Category": "カテゴリ",
+    "Choose": "選ぶ",
     "Client IP": "クライアントIP",
     "Client IP - Tooltip": "クライアントIP - ツールチップ",
     "Close": "閉じる",
@@ -71,6 +75,7 @@
     "Database type": "データベースタイプ",
     "Database type - Tooltip": "データベースタイプ - ツールチップ",
     "Delete": "削除",
+    "Detect": "検出する",
     "Display name": "表示名",
     "Display name - Tooltip": "表示名 - ツールチップ",
     "DisplayName - Category": "表示名 - カテゴリ",

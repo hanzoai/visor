@@ -68,3 +68,31 @@ export function RefreshAssetStatus() {
     credentials: "include",
   }).then(res => res.json());
 }
+
+export function DetectAssets() {
+  return fetch(`${Setting.ServerUrl}/api/detect-assets`, {
+    method: "POST",
+    credentials: "include",
+  }).then(res => res.json());
+}
+
+export function getDetectedAssets(owner, page = "", pageSize = "", field = "", value = "", sortField = "", sortOrder = "", silent = false) {
+  return fetch(`${Setting.ServerUrl}/api/get-detected-assets?owner=${owner}&p=${page}&pageSize=${pageSize}&field=${field}&value=${value}&sortField=${sortField}&sortOrder=${sortOrder}&silent=${silent}`, {
+    method: "GET",
+    credentials: "include",
+  }).then(res => res.json());
+}
+
+export function addDetectedAsset(owner, name) {
+  return fetch(`${Setting.ServerUrl}/api/add-detected-asset?owner=${owner}&name=${name}`, {
+    method: "POST",
+    credentials: "include",
+  }).then(res => res.json());
+}
+
+export function deleteDetectedAssets() {
+  return fetch(`${Setting.ServerUrl}/api/delete-detected-assets`, {
+    method: "POST",
+    credentials: "include",
+  }).then(res => res.json());
+}

@@ -14,106 +14,46 @@
 
 import React from "react";
 import {Link} from "react-router-dom";
-import {Button, Progress, Table, Tag, Upload} from "antd";
+import {Button, Progress, Table, Tag} from "antd";
 import BaseListPage from "./BaseListPage";
-import moment from "moment";
 import * as Setting from "./Setting";
 import * as AssetBackend from "./backend/AssetBackend";
 import i18next from "i18next";
-import PopconfirmModal from "./common/modal/PopconfirmModal";
-import {UploadOutlined} from "@ant-design/icons";
-import ConnectModal from "./common/modal/ConnectModal";
 
 const AssetStatusRunning = "Running";
-const AssetStatusStopped = "Stopped";
 
-class AssetListPage extends BaseListPage {
+class AssetDetectPage extends BaseListPage {
   constructor(props) {
     super(props);
     this.state = {
       ...this.state,
+      selectedRows: {},
+      detectionComplete: false,
     };
+    this.handleCheckboxChange = this.handleCheckboxChange.bind(this);
+    this.handleSelectedKeys = this.handleSelectedKeys.bind(this);
   }
 
   componentDidMount() {
-    this.assetMetricsTimer = setInterval(() => {
-      this.fetch({pagination: this.state.pagination, searchedColumn: this.state.searchedColumn, searchText: this.state.searchText, sortField: this.state.sortField, sortOrder: this.state.sortOrder}, true);
-    }, 1000);
-
-    this.assetStatusTimer = setInterval(() => {
-      AssetBackend.RefreshAssetStatus();
-    }, 5000);
-  }
-
-  componentWillUnmount() {
-    clearInterval(this.assetMetricsTimer);
-    clearInterval(this.assetStatusTimer);
-  }
-
-  newAsset() {
-    return {
-      owner: this.props.account.owner,
-      name: `machine_${this.state.data.length + 1}`,
-      createdTime: moment().format(),
-      displayName: `New Machine - ${this.state.data.length}`,
-      category: "Machine",
-      type: "RDP",
-      endpoint: "127.0.0.1",
-      port: 3389,
-      username: "Administrator",
-      password: "123",
-      language: "zh",
-      Os: "Windows",
-      autoQuery: false,
-      isPermanent: true,
-      remoteApps: [],
-      services: [],
-    };
-  }
-
-  addAsset() {
-    const newAsset = this.newAsset();
-    AssetBackend.addAsset(newAsset)
+    AssetBackend.deleteDetectedAssets()
       .then((res) => {
         if (res.status === "ok") {
-          this.props.history.push({pathname: `/assets/${newAsset.owner}/${newAsset.name}`, mode: "add"});
-          Setting.showMessage("success", "Asset added successfully");
-        } else {
-          Setting.showMessage("error", `Failed to add Asset: ${res.msg}`);
-        }
-      })
-      .catch(error => {
-        Setting.showMessage("error", `Asset failed to add: ${error}`);
-      });
-  }
+          AssetBackend.DetectAssets()
+            .then((res) => {
+              if (res.status === "ok") {
+                this.setState({detectionComplete: true});
+                Setting.showMessage("success", i18next.t("asset:Asset detection is complete."));
+              } else {
+                Setting.showMessage("error", `Failed to detect Asset: ${res.msg}`);
+              }
+            })
+            .catch(error => {
+              Setting.showMessage("error", `Failed to detect Asset: ${res.msg}`);
+            });
 
-  addRdpAsset(newAsset) {
-    AssetBackend.addAsset(newAsset)
-      .then((res) => {
-        if (res.status === "ok") {
-          this.props.history.push({pathname: `/assets/${newAsset.owner}/${newAsset.name}`, mode: "add"});
-          Setting.showMessage("success", "Asset added successfully");
-        } else {
-          Setting.showMessage("error", `Failed to add Asset: ${res.msg}`);
-        }
-      })
-      .catch(error => {
-        Setting.showMessage("error", `Asset failed to add: ${error}`);
-      });
-  }
-
-  deleteAsset(i) {
-    AssetBackend.deleteAsset(this.state.data[i])
-      .then((res) => {
-        if (res.status === "ok") {
-          Setting.showMessage("success", "Asset deleted successfully");
-          this.setState({
-            data: Setting.deleteRow(this.state.data, i),
-            pagination: {
-              ...this.state.pagination,
-              total: this.state.pagination.total - 1,
-            },
-          });
+          this.assetDetectTimer = setInterval(() => {
+            this.fetch({pagination: this.state.pagination, searchedColumn: this.state.searchedColumn, searchText: this.state.searchText, sortField: this.state.sortField, sortOrder: this.state.sortOrder}, true);
+          }, 3000);
         } else {
           Setting.showMessage("error", `Failed to delete Asset: ${res.msg}`);
         }
@@ -123,66 +63,31 @@ class AssetListPage extends BaseListPage {
       });
   }
 
+  componentWillUnmount() {
+    clearInterval(this.assetDetectTimer);
+    AssetBackend.deleteDetectedAssets();
+  }
+
   detectAsset() {
     this.props.history.push({pathname: "/assets/detect", mode: "add"});
   }
 
-  parseRdpFile = (content) => {
-    const ipMatch = /full address:s:(.*)/.exec(content);
-    const usernameMatch = /username:s:(.*)/.exec(content);
-
-    const ip = ipMatch ? ipMatch[1].trim() : "";
-    const username = usernameMatch ? usernameMatch[1].trim() : "";
-    if (ip !== "" && username !== "") {
-      const asset = this.newAsset();
-      asset.endpoint = ip;
-      asset.username = username;
-      asset.type = "RDP";
-      asset.port = 3389;
-      return asset;
-    } else {
-      Setting.showMessage("error", i18next.t("asset:Invalid RDP file"));
-      return null;
-    }
-  };
-
-  beforeUpload = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const contents = e.target.result;
-        const fileName = file.name.replace(/\.rdp$/i, "");
-        const asset = this.parseRdpFile(contents);
-        if (asset !== null) {
-          asset.name = fileName;
-          asset.displayName = fileName;
-          this.addRdpAsset(asset);
-        }
-        this.handleFileRemove(file);
-        resolve();
-      };
-      reader.readAsText(file);
-    });
-  };
-
-  handleFileRemove(file) {
-    this.uploadComponentRef.current && this.uploadComponentRef.current.onRemove(file);
+  handleCheckboxChange(key) {
+    this.setState(prevState => ({
+      selectedRows: {
+        ...prevState.selectedRows,
+        [key]: !prevState.selectedRows[key],
+      },
+    }));
   }
 
-  renderUpload() {
-    const props = {
-      name: "file",
-      accept: ".rdp",
-      beforeUpload: this.beforeUpload,
-    };
-
-    return (
-      <Upload {...props} ref={(ref) => (this.uploadComponentRef = ref)}>
-        <Button id="upload-button" type="primary" size="small">
-          <UploadOutlined /> {i18next.t("asset:Upload") + "(.rdp)"}
-        </Button>
-      </Upload>
-    );
+  handleSelectedKeys() {
+    const {selectedRows} = this.state;
+    const selectedKeys = Object.keys(selectedRows).filter(key => selectedRows[key]);
+    selectedKeys.forEach(key => {
+      AssetBackend.addDetectedAsset(Setting.getRequestOrganization(this.props.account), key);
+    });
+    this.props.history.push({pathname: "/assets"});
   }
 
   renderTable(assets) {
@@ -333,47 +238,18 @@ class AssetListPage extends BaseListPage {
         },
       },
       {
-        title: i18next.t("general:Action"),
-        dataIndex: "action",
-        key: "action",
-        width: "320px",
+        title: i18next.t("general:Choose"),
+        dataIndex: "Choose",
+        key: "Choose",
+        width: "160px",
         fixed: (Setting.isMobile()) ? "false" : "right",
         render: (text, record, index) => {
           return (
-            <div>
-              <ConnectModal
-                disabled={record.owner !== this.props.account.owner || record.status === AssetStatusStopped}
-                owner = {record.owner}
-                name = {record.name}
-                category = {record.category}
-              />
-              {
-                record.category === "Machine" &&
-                <Button
-                  disabled={record.sshStatus !== AssetStatusRunning}
-                  style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}}
-                  type="primary"
-                  onClick={() => {
-                    const link = `/assets/${record.owner}/${record.name}/view`;
-                    Setting.goToLink(link);
-                  }}
-                >
-                  {i18next.t("asset:Files")}
-                </Button>
-              }
-              <Button
-                disabled={record.owner !== this.props.account.owner}
-                style={{marginTop: "10px", marginBottom: "10px", marginRight: "10px"}}
-                onClick={() => this.props.history.push(`/assets/${record.owner}/${record.name}`)}
-              >{i18next.t("general:Edit")}
-              </Button>
-              <PopconfirmModal
-                disabled={record.owner !== this.props.account.owner}
-                title={i18next.t("general:Sure to delete") + `: ${record.name} ?`}
-                onConfirm={() => this.deleteAsset(index)}
-              >
-              </PopconfirmModal>
-            </div>
+            <input
+              type="checkbox"
+              checked={!!this.state.selectedRows[record.name]}
+              onChange={() => this.handleCheckboxChange(record.name)}
+            />
           );
         },
       },
@@ -384,22 +260,19 @@ class AssetListPage extends BaseListPage {
       total: this.state.pagination.total,
       showQuickJumper: true,
       showSizeChanger: true,
-      showTotal: () => i18next.t("general:{total} in total").replace("{total}", this.state.pagination.total),
     };
 
     return (
       <div>
         <Table scroll={{x: "max-content"}} columns={columns} dataSource={assets} rowKey={(asset) => `${asset.owner}/${asset.name}`} size="middle" bordered pagination={paginationProps}
           title={() => (
-            <div>
-              {i18next.t("general:Assets")}&nbsp;&nbsp;&nbsp;&nbsp;
-              <Button type="primary" size="small" onClick={this.addAsset.bind(this)}>{i18next.t("general:Add")}</Button>
-              &nbsp;&nbsp;
-              <Button type="primary" size="small" disabled={!Setting.isAdminUser(this.props.account)} onClick={this.detectAsset.bind(this)}>{i18next.t("general:Detect")}</Button>
-              &nbsp;&nbsp;
-              {
-                this.renderUpload()
-              }
+            <div style={{display: "flex", justifyContent: "center", alignItems: "center"}}>
+              <div style={{flex: 1, textAlign: "center"}}>
+                {this.state.detectionComplete ? i18next.t("asset:Detection Complete") : i18next.t("asset:Detecting Assets...Please wait.")}
+              </div>
+              <Button type="primary" size="small" style={{marginLeft: "auto"}} disabled={!Setting.isAdminUser(this.props.account)} onClick={this.handleSelectedKeys}>
+                {i18next.t("general:Add")}
+              </Button>
             </div>
           )}
           loading={this.state.loading}
@@ -422,7 +295,7 @@ class AssetListPage extends BaseListPage {
     if (!silent) {
       this.setState({loading: true});
     }
-    AssetBackend.getAssets(Setting.getRequestOrganization(this.props.account), params.pagination.current, params.pagination.pageSize, field, value, sortField, sortOrder, silent)
+    AssetBackend.getDetectedAssets(Setting.getRequestOrganization(this.props.account), params.pagination.current, params.pagination.pageSize, field, value, sortField, sortOrder, silent)
       .then((res) => {
         if (!silent) {
           this.setState({loading: false});
@@ -450,4 +323,4 @@ class AssetListPage extends BaseListPage {
   };
 }
 
-export default AssetListPage;
+export default AssetDetectPage;

@@ -9,8 +9,11 @@
     "Is Permanent - Tooltip": "Ist dauerhaft - Tooltip"
   },
   "asset": {
+    "Asset detection is complete.": "Die Erkennung der Vermögenswerte ist abgeschlossen.",
     "CPU": "CPU",
     "Cannot enable Remote App when Remote Apps are empty. Please add at least one Remote App in below table first, then enable again": "Remote-App kann nicht aktiviert werden, wenn keine Remote-Apps vorhanden sind. Bitte fügen Sie zuerst mindestens eine Remote-App in der unten stehenden Tabelle hinzu und aktivieren Sie sie dann erneut.",
+    "Detecting Assets...Please wait.": "Vermögenswerte werden erkannt...Bitte warten Sie.",
+    "Detection Complete": "Erkennung abgeschlossen",
     "Disk": "Festplatte",
     "Download RDP file": "RDP-Datei herunterladen",
     "Edit Asset": "Asset bearbeiten",
@@ -58,6 +61,7 @@
     "Back Home": "Zurück nach Hause",
     "Cancel": "Abbrechen",
     "Category": "Kategorie",
+    "Choose": "Wählen",
     "Client IP": "Kunden-IP",
     "Client IP - Tooltip": "Kunden-IP - Tooltip",
     "Close": "Schließen",
@@ -71,6 +75,7 @@
     "Database type": "Datenbanktyp",
     "Database type - Tooltip": "Datenbanktyp - Tooltip",
     "Delete": "Löschen",
+    "Detect": "Erkennen",
     "Display name": "Anzeigename",
     "Display name - Tooltip": "Anzeigename - Tooltip",
     "DisplayName - Category": "Anzeigename - Kategorie",

@@ -84,6 +84,43 @@
                 }
             }
         },
+        "/add-detected-asset": {
+            "post": {
+                "tags": [
+                    "Asset API"
+                ],
+                "description": "add a detected asset",
+                "operationId": "ApiController.AddDetectedAsset",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "owner",
+                        "description": "The owner of the asset",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/object.Asset"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "name",
+                        "description": "The name of the asset",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/object.Asset"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The Response object",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/add-file": {
             "post": {
                 "tags": [
@@ -252,6 +289,23 @@
                 }
             }
         },
+        "/delete-detected-assets": {
+            "post": {
+                "tags": [
+                    "Asset API"
+                ],
+                "description": "delete all detected assets",
+                "operationId": "ApiController.DeleteDetectedAssets",
+                "responses": {
+                    "200": {
+                        "description": "The Response object",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/delete-file": {
             "post": {
                 "tags": [
@@ -362,6 +416,23 @@
                         "description": "",
                         "schema": {
                             "$ref": "#/definitions/Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/detect-assets": {
+            "post": {
+                "tags": [
+                    "Asset API"
+                ],
+                "description": "detect assets in LAN automatically",
+                "operationId": "ApiController.DetectAssets",
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "schema": {
+                            "$ref": "#/definitions/controllers.Response"
                         }
                     }
                 }
@@ -510,6 +581,39 @@
                         "description": "The Response object",
                         "schema": {
                             "$ref": "#/definitions/object.Command"
+                        }
+                    }
+                }
+            }
+        },
+        "/get-detected-assets": {
+            "get": {
+                "tags": [
+                    "Asset API"
+                ],
+                "description": "get all detected assets",
+                "operationId": "ApiController.GetDetectedAssets",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "pageSize",
+                        "description": "The size of each page",
+                        "required": true,
+                        "type": "string"
+                    },
+                    {
+                        "in": "query",
+                        "name": "p",
+                        "description": "The number of the page",
+                        "required": true,
+                        "type": "string"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The Response object",
+                        "schema": {
+                            "$ref": "#/definitions/object.Asset"
                         }
                     }
                 }

@@ -9,8 +9,11 @@
     "Is Permanent - Tooltip": "Est Permanent - Infobulle"
   },
   "asset": {
+    "Asset detection is complete.": "La détection des actifs est terminée.",
     "CPU": "CPU",
     "Cannot enable Remote App when Remote Apps are empty. Please add at least one Remote App in below table first, then enable again": "Impossible d'activer l'application distante lorsque les applications distantes sont vides. Veuillez d'abord ajouter au moins une application distante dans le tableau ci-dessous, puis réactiver.",
+    "Detecting Assets...Please wait.": "Détection des actifs en cours... Veuillez patienter.",
+    "Detection Complete": "Détection terminée",
     "Disk": "Disque",
     "Download RDP file": "Télécharger le fichier RDP",
     "Edit Asset": "Modifier l'Actif",
@@ -58,6 +61,7 @@
     "Back Home": "Retour à l'Accueil",
     "Cancel": "Annuler",
     "Category": "Catégorie",
+    "Choose": "Choisir",
     "Client IP": "IP du Client",
     "Client IP - Tooltip": "IP du Client - Infobulle",
     "Close": "Fermer",
@@ -71,6 +75,7 @@
     "Database type": "Type de base de données",
     "Database type - Tooltip": "Type de base de données - Infobulle",
     "Delete": "Supprimer",
+    "Detect": "Détecter",
     "Display name": "Nom affiché",
     "Display name - Tooltip": "Nom affiché - Infobulle",
     "DisplayName - Category": "Nom affiché - Catégorie",

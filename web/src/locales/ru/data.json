@@ -9,8 +9,11 @@
     "Is Permanent - Tooltip": "Это постоянно - Всплывающая подсказка"
   },
   "asset": {
+    "Asset detection is complete.": "Обнаружение активов завершено.",
     "CPU": "ЦПУ",
     "Cannot enable Remote App when Remote Apps are empty. Please add at least one Remote App in below table first, then enable again": "Невозможно включить удалённое приложение, когда список удалённых приложений пуст. Пожалуйста, сначала добавьте хотя бы одно удалённое приложение в таблицу ниже, а затем включите снова",
+    "Detecting Assets...Please wait.": "Обнаружение активов... Пожалуйста, подождите.",
+    "Detection Complete": "Обнаружение завершено.",
     "Disk": "Диск",
     "Download RDP file": "Скачать файл RDP",
     "Edit Asset": "Редактировать актив",
@@ -58,6 +61,7 @@
     "Back Home": "На главную",
     "Cancel": "Отмена",
     "Category": "Категория",
+    "Choose": "выбирать",
     "Client IP": "IP клиента",
     "Client IP - Tooltip": "IP клиента - Всплывающая подсказка",
     "Close": "Закрыть",
@@ -71,6 +75,7 @@
     "Database type": "Тип базы данных",
     "Database type - Tooltip": "Тип базы данных - Всплывающая подсказка",
     "Delete": "Удалить",
+    "Detect": "обнаружить",
     "Display name": "Отображаемое имя",
     "Display name - Tooltip": "Отображаемое имя - Всплывающая подсказка",
     "DisplayName - Category": "Отображаемое имя - Категория",

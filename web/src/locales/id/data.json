@@ -9,8 +9,11 @@
     "Is Permanent - Tooltip": "Apakah Permanen - Tooltip"
   },
   "asset": {
+    "Asset detection is complete.": "Deteksi aset selesai.",
     "CPU": "CPU",
     "Cannot enable Remote App when Remote Apps are empty. Please add at least one Remote App in below table first, then enable again": "Tidak dapat mengaktifkan Aplikasi Remote ketika Aplikasi Remote kosong. Silakan tambahkan setidaknya satu Aplikasi Remote di tabel di bawah ini terlebih dahulu, kemudian aktifkan lagi",
+    "Detecting Assets...Please wait.": "Mendeteksi aset... Mohon tunggu.",
+    "Detection Complete": "Deteksi selesai.",
     "Disk": "Disk",
     "Download RDP file": "Unduh file RDP",
     "Edit Asset": "Edit Aset",
@@ -58,6 +61,7 @@
     "Back Home": "Kembali ke Beranda",
     "Cancel": "Batal",
     "Category": "Kategori",
+    "Choose": "Memilih",
     "Client IP": "IP Klien",
     "Client IP - Tooltip": "IP Klien - Tooltip",
     "Close": "Tutup",
@@ -71,6 +75,7 @@
     "Database type": "Tipe Basis Data",
     "Database type - Tooltip": "Tipe Basis Data - Tooltip",
     "Delete": "Hapus",
+    "Detect": "Mendeteksi",
     "Display name": "Nama Tampilan",
     "Display name - Tooltip": "Nama Tampilan - Tooltip",
     "DisplayName - Category": "Nama Tampilan - Kategori",

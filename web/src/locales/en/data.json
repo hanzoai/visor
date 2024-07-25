@@ -9,8 +9,11 @@
     "Is Permanent - Tooltip": "Is Permanent - Tooltip"
   },
   "asset": {
+    "Asset detection is complete.": "Asset detection is complete.",
     "CPU": "CPU",
     "Cannot enable Remote App when Remote Apps are empty. Please add at least one Remote App in below table first, then enable again": "Cannot enable Remote App when Remote Apps are empty. Please add at least one Remote App in below table first, then enable again",
+    "Detecting Assets...Please wait.": "Detecting Assets...Please wait.",
+    "Detection Complete": "Detection Complete",
     "Disk": "Disk",
     "Download RDP file": "Download RDP file",
     "Edit Asset": "Edit Asset",
@@ -58,6 +61,7 @@
     "Back Home": "Back Home",
     "Cancel": "Cancel",
     "Category": "Category",
+    "Choose": "Choose",
     "Client IP": "Client IP",
     "Client IP - Tooltip": "Client IP - Tooltip",
     "Close": "Close",
@@ -71,6 +75,7 @@
     "Database type": "Database type",
     "Database type - Tooltip": "Database type - Tooltip",
     "Delete": "Delete",
+    "Detect": "Detect",
     "Display name": "Display name",
     "Display name - Tooltip": "Display name - Tooltip",
     "DisplayName - Category": "DisplayName - Category",
