@@ -135,7 +135,7 @@ func IsAllowed(user *casdoorsdk.User, subOwner string, subName string, method st
 
 func isAllowedInDemoMode(method string, urlPath string) bool {
 	if method == "POST" {
-		if strings.HasPrefix(urlPath, "/api/signin") || urlPath == "/api/signout" || urlPath == "/api/add-asset-tunnel" || urlPath == "/api/start-session" || urlPath == "/api/stop-session" {
+		if strings.HasPrefix(urlPath, "/api/signin") || urlPath == "/api/signout" || urlPath == "/api/add-asset-tunnel" || urlPath == "/api/start-session" || urlPath == "/api/stop-session" || urlPath == "/api/refresh-asset-status" || urlPath == "/api/get-files" {
 			return true
 		} else {
 			return false
