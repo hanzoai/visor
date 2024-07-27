@@ -16,7 +16,7 @@ import * as Setting from "../Setting";
 
 export function getFiles(id, key, mode = "") {
   return fetch(`${Setting.ServerUrl}/api/get-files?id=${id}&key=${key}&mode=${mode}`, {
-    method: "POST",
+    method: "GET",
     credentials: "include",
     headers: {
       "Accept-Language": Setting.getAcceptLanguage(),
