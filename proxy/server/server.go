@@ -21,7 +21,10 @@ import (
 	"time"
 
 	"github.com/beego/beego/logs"
+	"github.com/casvisor/casvisor/conf"
+	"github.com/casvisor/casvisor/object"
 	"github.com/casvisor/casvisor/proxy/tunnel"
+	"github.com/casvisor/casvisor/util"
 )
 
 const (
@@ -71,7 +74,7 @@ func (s *Server) CloseClient(clientConn *tunnel.Conn) {
 		app.listener.Close()
 	}
 
-	s.proxyServer = make(map[string]*Server)
+	s.proxyServer = make(map[string]*Server, len(s.proxyServer))
 }
 
 func (s *Server) GetProxyApps(msg *tunnel.Message) (map[string]*tunnel.AppInfo, error) {
@@ -113,6 +116,20 @@ func (s *Server) initApp(clientConn *tunnel.Conn, msg *tunnel.Message) {
 		return
 	}
 
+	for _, app := range proxyApps {
+		assetId := util.GetIdFromOwnerAndName(conf.GetConfigString("casdoorOrganization"), app.Name)
+		asset, err := object.GetAsset(assetId)
+		if err != nil {
+			logs.Error(err)
+		}
+
+		asset.Status = object.AssetStatusRunning
+		_, err = object.UpdateAsset(assetId, asset)
+		if err != nil {
+			logs.Error(err)
+		}
+	}
+
 	// keep Heartbeat
 	go func() {
 		for {
@@ -136,7 +153,9 @@ func (s *Server) initApp(clientConn *tunnel.Conn, msg *tunnel.Message) {
 
 func (s *Server) startProxyApp(clientConn *tunnel.Conn, app *tunnel.AppInfo) {
 	if ps, ok := s.proxyServer[app.Name]; ok {
+		logs.Info("app server name", ps.Name)
 		ps.listener.Close()
+		ps.listener.Stop()
 	}
 
 	appProxyServer, err := NewProxyServer(app.Name, app.ListenPort)
@@ -151,10 +170,6 @@ func (s *Server) startProxyApp(clientConn *tunnel.Conn, app *tunnel.AppInfo) {
 		conn, err := appProxyServer.listener.GetConn()
 		if err != nil {
 			logs.Error("appProxyServer get conn err:", err)
-			ps, ok := s.proxyServer[app.Name]
-			if ok {
-				ps.listener.Close()
-			}
 			return
 		}
 		logs.Info("user connect success:", conn.String())
@@ -167,10 +182,6 @@ func (s *Server) startProxyApp(clientConn *tunnel.Conn, app *tunnel.AppInfo) {
 				if err == io.EOF {
 					logs.Error("Name [%s], server is dead!", appProxyServer.Name)
 					s.CloseClient(conn)
-					ps, ok := s.proxyServer[app.Name]
-					if ok {
-						ps.listener.Close()
-					}
 					return
 				}
 				continue
@@ -198,10 +209,6 @@ func (s *Server) startProxyApp(clientConn *tunnel.Conn, app *tunnel.AppInfo) {
 			time.AfterFunc(tunnel.BindConnTimeout, func() {
 				uc, ok := s.userConnMap.Load(app.Name)
 				if !ok || uc == nil {
-					ps, ok := s.proxyServer[app.Name]
-					if ok {
-						ps.listener.Close()
-					}
 					return
 				}
 				if conn == uc.(*tunnel.Conn) {
@@ -215,10 +222,7 @@ func (s *Server) startProxyApp(clientConn *tunnel.Conn, app *tunnel.AppInfo) {
 			msg := tunnel.NewMessage(tunnel.AppWaitBind, app.Name, app.Name, nil)
 			err := clientConn.SendMessage(msg)
 			if err != nil {
-				ps, ok := s.proxyServer[app.Name]
-				if ok {
-					ps.listener.Close()
-				}
+				logs.Warn(err)
 				return
 			}
 			appProxyServer.status = Ready
@@ -272,7 +276,7 @@ func (s *Server) handleRestartChan() {
 				logs.Error("send restart msg to client failed: ", err)
 				continue
 			}
-			s.CloseClient(clientConn)
+			s.proxyServer[appName].CloseClient(clientConn)
 		}
 	}
 }

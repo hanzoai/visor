@@ -54,8 +54,10 @@ func RefreshAssetStatus(asset *Asset) error {
 			sshStatus = AssetStatusRunning
 		}
 	} else {
-		status = AssetStatusStopped
-		sshStatus = AssetStatusStopped
+		if asset.GatewayPort == 0 {
+			status = AssetStatusStopped
+			sshStatus = AssetStatusStopped
+		}
 	}
 
 	if portOpen && asset.EnableSsh {

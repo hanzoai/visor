@@ -73,12 +73,12 @@ func (s *Starter) Start() {
 		return
 	}
 
-	s.initServer()
-	go s.Server.Start(s.restartClientChan)
-
 	if s.mode == clientMode {
 		s.initClient()
 		go s.Client.Start(s.startClientChan)
+	} else {
+		s.initServer()
+		go s.Server.Start(s.restartClientChan)
 	}
 
 	go func() {

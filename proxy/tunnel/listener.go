@@ -52,7 +52,7 @@ func (l *Listener) StartListen() {
 	for {
 		conn, err := l.Accept()
 		if err != nil {
-			continue
+			return
 		}
 		logs.Info("get remote conn: %s -> %s", conn.RemoteAddr(), conn.LocalAddr())
 		c := NewConn(conn)
@@ -85,4 +85,8 @@ func (l *Listener) GetConn() (conn *Conn, err error) {
 	}
 	l.ConnList.Append(conn)
 	return conn, nil
+}
+
+func (l *Listener) Stop() {
+	l.Listener.Close()
 }
