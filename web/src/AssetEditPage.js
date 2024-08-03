@@ -19,6 +19,7 @@ import * as Setting from "./Setting";
 import i18next from "i18next";
 import ServiceTable from "./ServiceTable";
 import RemoteAppTable from "./RemoteAppTable";
+import PatchTable from "./PatchTable";
 
 class AssetEditPage extends React.Component {
   constructor(props) {
@@ -474,6 +475,18 @@ class AssetEditPage extends React.Component {
                   }} />
                 </Col>
               </Row>
+              {asset.os === "Windows" &&
+              <Row style={{marginTop: "20px"}} >
+                <Col style={{marginTop: "5px"}} span={(Setting.isMobile()) ? 22 : 2}>
+                  {Setting.getLabel(i18next.t("asset:Patches"))} :
+                </Col>
+                <Col span={22} >
+                  <PatchTable title={i18next.t("asset:Patches")} table={asset.patches} onUpdateTable={(value) => {
+                    this.updateAssetField("patches", value);
+                  }} />
+                </Col>
+              </Row>
+              }
             </div>
           )}
       </Card>
