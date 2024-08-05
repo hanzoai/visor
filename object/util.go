@@ -39,6 +39,10 @@ func getUrlFromPath(path string, origin string) (string, error) {
 }
 
 func isPortOpen(host string, port int) bool {
+	if host == "" {
+		return false
+	}
+
 	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", host, port), 5*time.Second)
 	if err != nil {
 		return false
