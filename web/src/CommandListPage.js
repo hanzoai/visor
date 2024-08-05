@@ -30,9 +30,9 @@ class CommandListPage extends BaseListPage {
   newCommand() {
     return {
       owner: this.props.account.owner,
-      name: `command_${this.state.data.length + 1}`,
+      name: `command_${Setting.getRandomName()}`,
       createdTime: moment().format(),
-      displayName: `command_${this.state.data.length + 1}`,
+      displayName: `command_${Setting.getRandomName()}`,
       Command: "",
       Assets: [],
     };
