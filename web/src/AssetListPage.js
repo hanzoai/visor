@@ -123,10 +123,6 @@ class AssetListPage extends BaseListPage {
       });
   }
 
-  detectAsset() {
-    this.props.history.push({pathname: "/assets/detect", mode: "add"});
-  }
-
   parseRdpFile = (content) => {
     const ipMatch = /full address:s:(.*)/.exec(content);
     const usernameMatch = /username:s:(.*)/.exec(content);
