@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: visor-config
+  namespace: hanzo
+type: Opaque
+stringData:
+  app.conf: |
+    appname = hanzo-visor
+    httpport = 19000
+    runmode = prod
+    SessionOn = true
+    copyrequestbody = true
+    driverName = postgres
+    dataSourceName = "user=hanzo password=CHANGE_ME dbname=hanzo_visor host=postgres.hanzo.svc.cluster.local port=5432 sslmode=disable"
+    dbName = hanzo_visor
+    tableNamePrefix =
+    isDemoMode = false
+    logPostOnly = true
+    redisEndpoint =
+    guacamoleEndpoint = 127.0.0.1:4822
+    iamEndpoint = http://iam.hanzo.svc.cluster.local:8000
+    clientId = hanzo-visor-client-id
+    clientSecret = CHANGE_ME
+    iamOrganization = "hanzo"
+    iamApplication = "app-hanzo-visor"
+    redirectPath = /callback
+    isLocalIpDb = false
+    publicDomain = ""
+    adminDomain = ""
+    enableExtraPages = false
+    defaultLanguage = "en"
+    staticBaseUrl = "https://cdn.hanzo.ai"
+    htmlTitle = "Hanzo Visor"
+    faviconUrl = "https://cdn.hanzo.ai/static/favicon.png"
+    logoUrl = "https://cdn.hanzo.ai/img/hanzo-visor-logo.png"
+    showGithubCorner = false
+    defaultColorPrimary = "#fd4444"
+    logConfig = {"adapter":"console"}

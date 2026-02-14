@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: visor
+  namespace: hanzo
+  labels:
+    app: visor
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: visor
+  template:
+    metadata:
+      labels:
+        app: visor
+    spec:
+      imagePullSecrets:
+        - name: ghcr-secret
+      containers:
+        - name: visor
+          image: ghcr.io/hanzoai/visor:latest
+          ports:
+            - containerPort: 19000
+              protocol: TCP
+          env:
+            - name: RUNNING_IN_DOCKER
+              value: "true"
+          volumeMounts:
+            - name: config
+              mountPath: /conf/app.conf
+              subPath: app.conf
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 19000
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 19000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+      volumes:
+        - name: config
+          secret:
+            secretName: visor-config
