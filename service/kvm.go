@@ -121,3 +121,7 @@ func (client MachineKvmClient) UpdateMachineState(name string, state string) (bo
 
 	return true, fmt.Sprintf("Domain: [%s]'s state has been successfully updated to: [%s]", name, state), nil
 }
+
+func (client MachineKvmClient) CreateMachine(spec *CreateMachineSpec) (*Machine, error) {
+	return nil, fmt.Errorf("CreateMachine not yet implemented for KVM")
+}

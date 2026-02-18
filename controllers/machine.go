@@ -19,6 +19,7 @@ import (
 
 	"github.com/beego/beego/utils/pagination"
 	"github.com/casvisor/casvisor/object"
+	"github.com/casvisor/casvisor/service"
 	"github.com/casvisor/casvisor/util"
 )
 
@@ -156,4 +157,38 @@ func (c *ApiController) DeleteMachine() {
 
 	c.Data["json"] = wrapActionResponse(object.DeleteMachine(&machine))
 	c.ServeJSON()
+}
+
+// LaunchMachine
+// @Title LaunchMachine
+// @Tag Machine API
+// @Description launch a new cloud machine instance via a provider
+// @Param   body    body   service.CreateMachineSpec  true  "The spec for the machine to launch"
+// @Param   owner   query  string  true  "The owner"
+// @Param   provider query string  true  "The provider name"
+// @Success 200 {object} object.Machine The Response object
+// @router /launch-machine [post]
+func (c *ApiController) LaunchMachine() {
+	owner := c.Input().Get("owner")
+	provider := c.Input().Get("provider")
+
+	if owner == "" || provider == "" {
+		c.ResponseError("owner and provider query parameters are required")
+		return
+	}
+
+	var spec service.CreateMachineSpec
+	err := json.Unmarshal(c.Ctx.Input.RequestBody, &spec)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+
+	machine, err := object.CreateMachineCloud(owner, provider, &spec)
+	if err != nil {
+		c.ResponseError(err.Error())
+		return
+	}
+
+	c.ResponseOk(machine)
 }

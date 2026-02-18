@@ -167,3 +167,7 @@ func (client MachineAliyunClient) UpdateMachineState(name string, state string) 
 
 	return true, fmt.Sprintf("Instance: [%s]'s state has been successfully updated to: [%s]", name, state), nil
 }
+
+func (client MachineAliyunClient) CreateMachine(spec *CreateMachineSpec) (*Machine, error) {
+	return nil, fmt.Errorf("CreateMachine not yet implemented for Aliyun")
+}

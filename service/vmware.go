@@ -161,3 +161,7 @@ func (client MachineVmwareClient) GetMachine(name string) (*Machine, error) {
 func (client MachineVmwareClient) UpdateMachineState(name string, state string) (bool, string, error) {
 	return false, "", fmt.Errorf("Not implemented")
 }
+
+func (client MachineVmwareClient) CreateMachine(spec *CreateMachineSpec) (*Machine, error) {
+	return nil, fmt.Errorf("CreateMachine not yet implemented for VMware")
+}

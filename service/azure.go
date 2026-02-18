@@ -104,3 +104,7 @@ func (client MachineAzureClient) GetMachine(name string) (*Machine, error) {
 func (client MachineAzureClient) UpdateMachineState(name string, state string) (bool, string, error) {
 	return false, "", fmt.Errorf("Not implemented")
 }
+
+func (client MachineAzureClient) CreateMachine(spec *CreateMachineSpec) (*Machine, error) {
+	return nil, fmt.Errorf("CreateMachine not yet implemented for Azure")
+}

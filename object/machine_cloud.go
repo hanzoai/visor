@@ -113,6 +113,51 @@ func SyncMachinesCloud(owner string) (bool, error) {
 	return affected, err
 }
 
+// CreateMachineCloud launches a new VM via the cloud provider and registers it in the DB.
+func CreateMachineCloud(owner string, providerName string, spec *service.CreateMachineSpec) (*Machine, error) {
+	provider, err := getProvider(owner, providerName)
+	if err != nil {
+		return nil, err
+	}
+	if provider == nil {
+		return nil, fmt.Errorf("provider %q not found for owner %q", providerName, owner)
+	}
+
+	client, err := service.NewMachineClient(provider.Type, provider.ClientId, provider.ClientSecret, provider.Region)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create machine client: %w", err)
+	}
+
+	clientMachine, err := client.CreateMachine(spec)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cloud machine: %w", err)
+	}
+
+	machine := getMachineFromService(owner, providerName, clientMachine)
+	machine.Os = spec.OS
+
+	// Set remote access defaults based on OS
+	switch spec.OS {
+	case "windows":
+		machine.RemoteProtocol = "RDP"
+		machine.RemotePort = 3389
+	case "macos":
+		machine.RemoteProtocol = "VNC"
+		machine.RemotePort = 5900
+	default:
+		machine.RemoteProtocol = "SSH"
+		machine.RemotePort = 22
+	}
+
+	// Persist to DB
+	_, err = AddMachine(machine)
+	if err != nil {
+		return nil, fmt.Errorf("machine created in cloud but DB insert failed: %w", err)
+	}
+
+	return machine, nil
+}
+
 func updateMachineCloud(oldMachine *Machine, machine *Machine) (bool, error) {
 	provider, err := getProvider(oldMachine.Owner, oldMachine.Provider)
 	if err != nil {

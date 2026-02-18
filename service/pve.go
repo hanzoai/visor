@@ -139,3 +139,7 @@ func (client MachinePveClient) UpdateMachineState(name string, state string) (bo
 
 	return true, fmt.Sprintf("VirtualMachine: [%s]'s state has been successfully updated to: [%s]", name, state), nil
 }
+
+func (client MachinePveClient) CreateMachine(spec *CreateMachineSpec) (*Machine, error) {
+	return nil, fmt.Errorf("CreateMachine not yet implemented for PVE")
+}
