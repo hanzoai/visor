@@ -149,3 +149,7 @@ func (client MachineGcpClient) UpdateMachineState(name string, state string) (bo
 
 	return true, fmt.Sprintf("Instance: [%s]'s state has been successfully updated to: [%s]", name, state), nil
 }
+
+func (client MachineGcpClient) CreateMachine(spec *CreateMachineSpec) (*Machine, error) {
+	return nil, fmt.Errorf("CreateMachine not yet implemented for GCP")
+}

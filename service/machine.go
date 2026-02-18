@@ -16,10 +16,22 @@ package service
 
 import "fmt"
 
+// CreateMachineSpec describes parameters for launching a new cloud instance.
+type CreateMachineSpec struct {
+	Name         string `json:"name"`
+	DisplayName  string `json:"displayName"`
+	InstanceType string `json:"instanceType"` // e.g. "t3.medium", "mac2.metal"
+	ImageID      string `json:"imageId"`      // AMI ID, image name, etc.
+	OS           string `json:"os"`           // "linux", "macos", "windows"
+	Region       string `json:"region"`
+	Tags         map[string]string `json:"tags,omitempty"`
+}
+
 type MachineClientInterface interface {
 	GetMachines() ([]*Machine, error)
 	GetMachine(name string) (*Machine, error)
 	UpdateMachineState(name string, state string) (bool, string, error)
+	CreateMachine(spec *CreateMachineSpec) (*Machine, error)
 }
 
 func NewMachineClient(providerType string, accessKeyId string, accessKeySecret string, region string) (MachineClientInterface, error) {

@@ -151,3 +151,7 @@ func (client MachineDigitalOceanClient) UpdateMachineState(name string, state st
 
 	return true, fmt.Sprintf("Droplet: [%s]'s state has been successfully updated to: [%s]", name, state), nil
 }
+
+func (client MachineDigitalOceanClient) CreateMachine(spec *CreateMachineSpec) (*Machine, error) {
+	return nil, fmt.Errorf("CreateMachine not yet implemented for DigitalOcean")
+}
