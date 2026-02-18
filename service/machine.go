@@ -39,6 +39,8 @@ func NewMachineClient(providerType string, accessKeyId string, accessKeySecret s
 		res, err = newMachineGcpClient(accessKeyId, accessKeySecret, region)
 	} else if providerType == "AWS" {
 		res, err = newMachineAwsClient(accessKeyId, accessKeySecret, region)
+	} else if providerType == "DigitalOcean" {
+		res, err = newMachineDigitalOceanClient(accessKeyId, accessKeySecret, region)
 	} else {
 		return nil, fmt.Errorf("unsupported provider type: %s", providerType)
 	}
