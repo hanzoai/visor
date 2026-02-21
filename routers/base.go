@@ -19,7 +19,7 @@ import (
 	"net/http"
 
 	"github.com/beego/beego/context"
-	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
+	"github.com/hanzoid/go-sdk/casdoorsdk"
 	"github.com/casvisor/casvisor/conf"
 	"github.com/casvisor/casvisor/util"
 )
