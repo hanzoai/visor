@@ -18,7 +18,7 @@ import (
 	"encoding/gob"
 
 	"github.com/beego/beego"
-	"github.com/casdoor/casdoor-go-sdk/casdoorsdk"
+	"github.com/hanzoid/go-sdk/casdoorsdk"
 )
 
 type ApiController struct {
