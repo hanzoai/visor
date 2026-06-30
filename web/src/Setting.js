@@ -23,8 +23,8 @@ import {v4 as uuidv4} from "uuid";
 export let ServerUrl = "";
 export let IamSdk;
 
-// IAM origin + app identifiers captured at init. The IAM is Casdoor-derived, so
-// its account-management pages (account / users / organizations / signup) are
+// IAM origin + app identifiers captured at init. Hanzo IAM's
+// account-management pages (account / users / organizations / signup) are
 // server-hosted UI — built as plain deep links, not OIDC/SDK endpoints.
 let IamServerUrl = "";
 let IamAppName = "";
