@@ -1,6 +1,43 @@
-Visor
+Hanzo Visor
 Copyright (c) 2023-2026 Hanzo AI, Inc.
 
-This product includes software from Casvisor (https://github.com/casvisor/casvisor), licensed under Apache-2.0:
+This product includes software developed by Hanzo AI, Inc.
+
+Forked from Casvisor (https://github.com/casvisor/casvisor), licensed under
+Apache-2.0. The fork originated from the upstream Go module
+github.com/casvisor/casvisor.
+
+This product includes software from Casvisor, licensed under Apache-2.0:
 
     Copyright 2023 The casbin Authors. All Rights Reserved.
+
+Per Apache-2.0 section 4(d): the source tree carries no upstream Casvisor NOTICE
+file to merge; the upstream copyright attribution is preserved above.
+
+DEVIATIONS
+Changes made by Hanzo AI, Inc. relative to upstream Casvisor:
+
+- Rebranded the product to "Hanzo Visor": served web UI <title>
+  (web/public/index.html) and README product name.
+- Renamed the Go module github.com/casvisor/casvisor -> github.com/hanzoai/visor
+  (go.mod); every casdoor/casvisor import was replaced with hanzoai/* — no
+  casvisor or casdoor module remains in go.sum.
+- Replaced the Casdoor authentication SDK with Hanzo IAM
+  (github.com/hanzoai/iam) and Hanzo authz (github.com/hanzoai/authz);
+  configuration reads iam* keys with a legacy casdoor* fallback
+  (controllers/account.go).
+- Added an in-process embed API — Bootstrap() and Handler()
+  (pkg/visor/embed.go) — so the Hanzo cloud binary can mount Visor without a
+  separate process.
+- Added compute billing (billing/): fleet pricing at a flat one-third resell
+  markup, with usage metering via github.com/hanzoai/commerce/metering
+  (service/metering.go).
+- Added analytics: emits compute fleet, cluster, and nodepool events into the
+  analytics datastore (service/analytics.go, service/compute.go) with
+  OpenTelemetry instrumentation (telemetry/).
+- Routed object and machine storage through a pluggable storage seam (object/),
+  backed by Hanzo Base.
+- Added high-availability leader election via github.com/hanzoai/ha in the
+  object coordinator (object/coordinator.go) and node autoscaling (autoscaler/).
+- Default datastore is PostgreSQL (conf/app.conf: driverName=postgres, database
+  hanzo_visor).
