@@ -81,20 +81,32 @@ func volumeFieldName(k string) string {
 	return parts[len(parts)-1]
 }
 
-// podUID gets pod UID from the pod log path.
-func podUID(s *specs.Spec) (string, error) {
-	sandboxLogDir := s.Annotations[sandboxLogDirAnnotation]
-	if sandboxLogDir == "" {
-		return "", fmt.Errorf("no sandbox log path annotation")
+// PodUID gets pod UID from the pod annotations or mount paths.
+func PodUID(s *specs.Spec) (string, error) {
+	if s.Annotations != nil {
+		if uid := s.Annotations[sandboxUIDAnnotation]; uid != "" {
+			return uid, nil
+		}
+		if sandboxLogDir := s.Annotations[sandboxLogDirAnnotation]; sandboxLogDir != "" {
+			fields := strings.Split(filepath.Base(sandboxLogDir), "_")
+			switch len(fields) {
+			case 1: // This is the old CRI logging path.
+				return fields[0], nil
+			case 3: // This is the new CRI logging path.
+				return fields[2], nil
+			}
+		}
 	}
-	fields := strings.Split(filepath.Base(sandboxLogDir), "_")
-	switch len(fields) {
-	case 1: // This is the old CRI logging path.
-		return fields[0], nil
-	case 3: // This is the new CRI logging path.
-		return fields[2], nil
+	for _, m := range s.Mounts {
+		if strings.HasPrefix(m.Source, kubeletPodsDir+"/") {
+			rel := strings.TrimPrefix(m.Source, kubeletPodsDir+"/")
+			parts := strings.Split(rel, "/")
+			if len(parts) > 0 && parts[0] != "" {
+				return parts[0], nil
+			}
+		}
 	}
-	return "", fmt.Errorf("unexpected sandbox log path %q", sandboxLogDir)
+	return "", fmt.Errorf("could not determine pod UID from spec")
 }
 
 // isVolumeKey checks whether an annotation key is for volume.
@@ -172,7 +184,7 @@ func UpdateVolumeAnnotations(s *specs.Spec) (bool, error) {
 			// consumed from this container's spec. So fix mount annotations by:
 			// 1. Adding source annotation.
 			// 2. Fixing type annotation.
-			uid, err := podUID(s)
+			uid, err := PodUID(s)
 			if err != nil {
 				// Skip if we can't get pod UID, because this doesn't work
 				// for containerd 1.1.

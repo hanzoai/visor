@@ -733,6 +733,10 @@ func newInit(workDir, namespace string, platform stdio.Platform, r *proc.CreateC
 	p.IoGID = int(options.IoGID)
 	p.Sandbox = specutils.SpecContainerType(spec) == specutils.ContainerTypeSandbox
 	p.UserLog = utils.UserLogPath(spec)
+	if uid, err := utils.PodUID(spec); err == nil {
+		p.PodUID = uid
+	}
+	p.FuseAbort = utils.FuseAbortOnTeardown(spec, r.Bundle)
 	p.Monitor = reaper.Default
 	return p, nil
 }
