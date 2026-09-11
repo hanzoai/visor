@@ -59,7 +59,10 @@ const module = "gvisor.dev/gvisor/"
 // fails naming the type. Adding a method means adding its two payloads.
 var roots = []reflect.Type{
 	// pkg/urpc: the envelope itself.
+	reflect.TypeFor[urpc.Call](),
+	reflect.TypeFor[urpc.Echo](),
 	reflect.TypeFor[urpc.FilePayload](),
+	reflect.TypeFor[urpc.Result](),
 
 	// pkg/sentry/control.
 	reflect.TypeFor[control.CatOpts](),
@@ -69,6 +72,7 @@ var roots = []reflect.Type{
 	reflect.TypeFor[control.ContainerArgs](),
 	reflect.TypeFor[control.EventsOpts](),
 	reflect.TypeFor[control.ExecArgs](),
+	reflect.TypeFor[control.ExitStatus](),
 	reflect.TypeFor[control.GetRegisteredMetricsOpts](),
 	reflect.TypeFor[control.LoggingArgs](),
 	reflect.TypeFor[control.MemoryUsage](),
@@ -81,7 +85,9 @@ var roots = []reflect.Type{
 	reflect.TypeFor[control.MountOpts](),
 	reflect.TypeFor[control.Process](),
 	reflect.TypeFor[control.PsArgs](),
+	reflect.TypeFor[control.PsResult](),
 	reflect.TypeFor[control.ReadOpts](),
+	reflect.TypeFor[control.RunningResult](),
 	reflect.TypeFor[control.SaveOpts](),
 	reflect.TypeFor[control.SaveRestoreExecOpts](),
 	reflect.TypeFor[control.SignalContainerArgs](),
@@ -112,13 +118,21 @@ var roots = []reflect.Type{
 	reflect.TypeFor[boot.CreateArgs](),
 	reflect.TypeFor[boot.CreateLinksAndRoutesArgs](),
 	reflect.TypeFor[boot.CreateTraceSessionArgs](),
+	reflect.TypeFor[boot.DeleteTraceSessionArgs](),
+	reflect.TypeFor[boot.EventOut](),
+	reflect.TypeFor[boot.ExecResult](),
 	reflect.TypeFor[boot.FSSaveArgs](),
 	reflect.TypeFor[boot.InitPluginStackArgs](),
 	reflect.TypeFor[boot.MountArgs](),
 	reflect.TypeFor[boot.PortForwardOpts](),
+	reflect.TypeFor[boot.ProcessesResult](),
+	reflect.TypeFor[boot.ProcfsResult](),
+	reflect.TypeFor[boot.RuntimeStateResult](),
 	reflect.TypeFor[boot.Savings](),
 	reflect.TypeFor[boot.SignalArgs](),
+	reflect.TypeFor[boot.Stacks](),
 	reflect.TypeFor[boot.StartArgs](),
+	reflect.TypeFor[boot.TraceSessionsResult](),
 	reflect.TypeFor[boot.WaitFSRestoreArgs](),
 	reflect.TypeFor[boot.WaitPIDArgs](),
 

@@ -140,11 +140,11 @@ func (m *metricMetadata) fieldVals(fieldToVal map[*pb.MetricMetadata_Field]strin
 }
 
 // labels returns a label key-value map associated with the metricMetadata.
-func (m *metricMetadata) labels() map[string]string {
+func (m *metricMetadata) labels() []Label {
 	if len(m.Fields) == 0 {
 		return nil
 	}
-	return m.Fields
+	return Labels(m.Fields)
 }
 
 // int returns a new Data struct with the given value for the current metric.
@@ -1334,9 +1334,9 @@ func TestSnapshotToPrometheus(t *testing.T) {
 			},
 			SnapshotExportOptions: SnapshotExportOptions{
 				ExporterPrefix: "some_prefix_",
-				ExtraLabels: map[string]string{
+				ExtraLabels: Labels(map[string]string{
 					"field3": "val3a",
-				},
+				}),
 			},
 			WantData: `
 				# HELP some_prefix_foo_int An integer about foo
@@ -1351,9 +1351,9 @@ func TestSnapshotToPrometheus(t *testing.T) {
 				fooInt.fieldVal(field2, "val2b").fieldVal(field1, "val1b").int(7),
 			),
 			SnapshotExportOptions: SnapshotExportOptions{
-				ExtraLabels: map[string]string{
+				ExtraLabels: Labels(map[string]string{
 					"field3": "val3a",
-				},
+				}),
 			},
 			WantData: `
 				# HELP foo_int An integer about foo
@@ -1369,10 +1369,10 @@ func TestSnapshotToPrometheus(t *testing.T) {
 				fooInt.fieldVal(field2, "val2b").fieldVal(field1, "val1b").int(7),
 			),
 			SnapshotExportOptions: SnapshotExportOptions{
-				ExtraLabels: map[string]string{
+				ExtraLabels: Labels(map[string]string{
 					"field2": "val2c",
 					"field3": "val3a",
-				},
+				}),
 			},
 			WantFail: true,
 		},
@@ -1477,7 +1477,7 @@ func TestSnapshotToPrometheus(t *testing.T) {
 			},
 			SnapshotExportOptions: SnapshotExportOptions{
 				ExporterPrefix: "some_prefix_",
-				ExtraLabels:    map[string]string{"field2": "val2a"},
+				ExtraLabels:    Labels(map[string]string{"field2": "val2a"}),
 			},
 			WantData: `
 				# HELP some_prefix_foo_dist A distribution about foo
@@ -1692,9 +1692,9 @@ func TestGroupSameNameMetrics(t *testing.T) {
 	)
 	var buf bytes.Buffer
 	_, err := Write(&buf, ExportOptions{}, map[*Snapshot]SnapshotExportOptions{
-		snapshot1: {ExporterPrefix: "my_little_prefix_", ExtraLabels: map[string]string{"snap": "1"}},
-		snapshot2: {ExporterPrefix: "my_little_prefix_", ExtraLabels: map[string]string{"snap": "2"}},
-		snapshot3: {ExporterPrefix: "not_the_same_prefix_", ExtraLabels: map[string]string{"snap": "1"}},
+		snapshot1: {ExporterPrefix: "my_little_prefix_", ExtraLabels: Labels(map[string]string{"snap": "1"})},
+		snapshot2: {ExporterPrefix: "my_little_prefix_", ExtraLabels: Labels(map[string]string{"snap": "2"})},
+		snapshot3: {ExporterPrefix: "not_the_same_prefix_", ExtraLabels: Labels(map[string]string{"snap": "1"})},
 	})
 	if err != nil {
 		t.Fatalf("Cannot write snapshot data: %v", err)

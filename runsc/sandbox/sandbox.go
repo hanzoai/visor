@@ -482,7 +482,7 @@ func (s *Sandbox) StartRoot(conf *config.Config, spec *specs.Spec) error {
 	}
 
 	// Send a message to the sandbox control server to start the root container.
-	if err := conn.Call(boot.ContMgrRootContainerStart, &s.ID, nil); err != nil {
+	if err := conn.Call(boot.ContMgrRootContainerStart, &control.ContainerArgs{ContainerID: s.ID}, nil); err != nil {
 		return fmt.Errorf("starting root container: %w", err)
 	}
 
@@ -706,11 +706,11 @@ func (s *Sandbox) RestoreSubcontainer(spec *specs.Spec, conf *config.Config, cid
 // given container in this sandbox.
 func (s *Sandbox) Processes(cid string) ([]*control.Process, error) {
 	log.Debugf("Getting processes for container %q in sandbox %q", cid, s.ID)
-	var pl []*control.Process
-	if err := s.call(boot.ContMgrProcesses, &cid, &pl); err != nil {
+	var out boot.ProcessesResult
+	if err := s.call(boot.ContMgrProcesses, &control.ContainerArgs{ContainerID: cid}, &out); err != nil {
 		return nil, fmt.Errorf("retrieving process data from sandbox: %v", err)
 	}
-	return pl, nil
+	return out.Processes, nil
 }
 
 // CreateTraceSession creates a new trace session.
@@ -743,7 +743,7 @@ func (s *Sandbox) CreateTraceSession(config *seccheck.SessionConfig, force bool)
 // DeleteTraceSession deletes an existing trace session.
 func (s *Sandbox) DeleteTraceSession(name string) error {
 	log.Debugf("Deleting trace session %q in sandbox %q", name, s.ID)
-	if err := s.call(boot.ContMgrDeleteTraceSession, name, nil); err != nil {
+	if err := s.call(boot.ContMgrDeleteTraceSession, &boot.DeleteTraceSessionArgs{Name: name}, nil); err != nil {
 		return fmt.Errorf("deleting trace session: %w", err)
 	}
 	return nil
@@ -752,21 +752,21 @@ func (s *Sandbox) DeleteTraceSession(name string) error {
 // ListTraceSessions lists all trace sessions.
 func (s *Sandbox) ListTraceSessions() ([]seccheck.SessionConfig, error) {
 	log.Debugf("Listing trace sessions in sandbox %q", s.ID)
-	var sessions []seccheck.SessionConfig
-	if err := s.call(boot.ContMgrListTraceSessions, nil, &sessions); err != nil {
+	var out boot.TraceSessionsResult
+	if err := s.call(boot.ContMgrListTraceSessions, nil, &out); err != nil {
 		return nil, fmt.Errorf("listing trace session: %w", err)
 	}
-	return sessions, nil
+	return out.Sessions, nil
 }
 
 // ProcfsDump collects and returns a procfs dump for the sandbox.
 func (s *Sandbox) ProcfsDump() ([]procfs.ProcessProcfsDump, error) {
 	log.Debugf("Procfs dump %q", s.ID)
-	var procfsDump []procfs.ProcessProcfsDump
-	if err := s.call(boot.ContMgrProcfsDump, nil, &procfsDump); err != nil {
+	var out boot.ProcfsResult
+	if err := s.call(boot.ContMgrProcfsDump, nil, &out); err != nil {
 		return nil, fmt.Errorf("getting sandbox %q stacks: %w", s.ID, err)
 	}
-	return procfsDump, nil
+	return out.Processes, nil
 }
 
 // NewCGroup returns the sandbox's Cgroup, or an error if it does not have one.
@@ -794,18 +794,18 @@ func (s *Sandbox) Execute(conf *config.Config, args *control.ExecArgs) (int32, e
 	}
 
 	// Send a message to the sandbox control server to start the container.
-	var pid int32
-	if err := s.call(boot.ContMgrExecuteAsync, args, &pid); err != nil {
+	var out boot.ExecResult
+	if err := s.call(boot.ContMgrExecuteAsync, args, &out); err != nil {
 		return 0, fmt.Errorf("executing command %q in sandbox: %w", args, err)
 	}
-	return pid, nil
+	return out.PID, nil
 }
 
 // Event retrieves stats about the sandbox such as memory and CPU utilization.
 func (s *Sandbox) Event(cid string) (*boot.EventOut, error) {
 	log.Debugf("Getting events for container %q in sandbox %q", cid, s.ID)
 	var e boot.EventOut
-	if err := s.call(boot.ContMgrEvent, &cid, &e); err != nil {
+	if err := s.call(boot.ContMgrEvent, &control.ContainerArgs{ContainerID: cid}, &e); err != nil {
 		return nil, fmt.Errorf("retrieving event data from sandbox: %w", err)
 	}
 	return &e, nil
@@ -1493,8 +1493,9 @@ func (s *Sandbox) Wait(cid string) (unix.WaitStatus, error) {
 		defer conn.Close()
 
 		// Try the Wait RPC to the sandbox.
-		var ws unix.WaitStatus
-		err = conn.Call(boot.ContMgrWait, &cid, &ws)
+		var status control.ExitStatus
+		err = conn.Call(boot.ContMgrWait, &control.ContainerArgs{ContainerID: cid}, &status)
+		ws := unix.WaitStatus(status.Status)
 		conn.Close()
 		if err == nil {
 			if s.IsRootContainer(cid) {
@@ -1534,15 +1535,15 @@ func (s *Sandbox) Wait(cid string) (unix.WaitStatus, error) {
 // WaitStatus.
 func (s *Sandbox) WaitPID(cid string, pid int32) (unix.WaitStatus, error) {
 	log.Debugf("Waiting for PID %d in sandbox %q", pid, s.ID)
-	var ws unix.WaitStatus
+	var status control.ExitStatus
 	args := &boot.WaitPIDArgs{
 		PID: pid,
 		CID: cid,
 	}
-	if err := s.call(boot.ContMgrWaitPID, args, &ws); err != nil {
-		return ws, fmt.Errorf("waiting on PID %d in sandbox %q: %w", pid, s.ID, err)
+	if err := s.call(boot.ContMgrWaitPID, args, &status); err != nil {
+		return unix.WaitStatus(status.Status), fmt.Errorf("waiting on PID %d in sandbox %q: %w", pid, s.ID, err)
 	}
-	return ws, nil
+	return unix.WaitStatus(status.Status), nil
 }
 
 // WaitCheckpoint waits for the Kernel to have been successfully checkpointed.
@@ -2174,11 +2175,11 @@ func (s *Sandbox) IsRunning() bool {
 // Stacks collects and returns all stacks for the sandbox.
 func (s *Sandbox) Stacks() (string, error) {
 	log.Debugf("Stacks sandbox %q", s.ID)
-	var stacks string
-	if err := s.call(boot.DebugStacks, nil, &stacks); err != nil {
+	var out boot.Stacks
+	if err := s.call(boot.DebugStacks, nil, &out); err != nil {
 		return "", fmt.Errorf("getting sandbox %q stacks: %w", s.ID, err)
 	}
-	return stacks, nil
+	return out.Text, nil
 }
 
 // HeapProfile writes a heap profile to the given file.
@@ -2272,7 +2273,7 @@ func (s *Sandbox) destroyContainer(cid string) error {
 	}
 
 	log.Debugf("Destroying container, cid: %s, sandbox: %s", cid, s.ID)
-	if err := s.call(boot.ContMgrDestroySubcontainer, &cid, nil); err != nil {
+	if err := s.call(boot.ContMgrDestroySubcontainer, &control.ContainerArgs{ContainerID: cid}, nil); err != nil {
 		return fmt.Errorf("destroying container %q: %w", cid, err)
 	}
 	return nil
@@ -2583,12 +2584,12 @@ func (s *Sandbox) Mount(cid, fstype, src, dest string) error {
 // ContainerRuntimeState returns the runtime state of a container.
 func (s *Sandbox) ContainerRuntimeState(cid string) (boot.ContainerRuntimeState, error) {
 	log.Debugf("ContainerRuntimeState, sandbox: %q, cid: %q", s.ID, cid)
-	var state boot.ContainerRuntimeState
-	if err := s.call(boot.ContMgrContainerRuntimeState, &cid, &state); err != nil {
+	var out boot.RuntimeStateResult
+	if err := s.call(boot.ContMgrContainerRuntimeState, &control.ContainerArgs{ContainerID: cid}, &out); err != nil {
 		return boot.RuntimeStateInvalid, fmt.Errorf("getting container state (CID: %q): %w", cid, err)
 	}
-	log.Debugf("ContainerRuntimeState, sandbox: %q, cid: %q, state: %v", s.ID, cid, state)
-	return state, nil
+	log.Debugf("ContainerRuntimeState, sandbox: %q, cid: %q, state: %v", s.ID, cid, out.State)
+	return out.State, nil
 }
 
 // TarRootfsUpperLayer serializes the rootfs upper layer of a given

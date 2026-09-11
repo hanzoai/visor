@@ -67,8 +67,21 @@ type Stat struct {
 }
 
 // Mapping contains information for /proc/[pid]/maps.
+// Range is a mapping's address range. It restates hostarch.AddrRange, whose
+// bounds are uintptr: an address is a number here, and a uintptr has no width
+// two ends of a wire can agree on.
+type Range struct {
+	Start uint64
+	End   uint64
+}
+
+// Overlaps reports whether r and o share an address.
+func (r Range) Overlaps(o Range) bool {
+	return r.Start < o.End && o.Start < r.End
+}
+
 type Mapping struct {
-	Address     hostarch.AddrRange  `json:"address,omitempty"`
+	Address     Range               `json:"address,omitempty"`
 	Permissions hostarch.AccessType `json:"permissions"`
 	Private     string              `json:"private,omitempty"`
 	Offset      uint64              `json:"offset"`
@@ -98,7 +111,7 @@ type ProcessProcfsDump struct {
 	Root string `json:"root,omitempty"`
 	// Limits constrains resource limits for this process. Currently only
 	// RLIMIT_NOFILE is supported.
-	Limits map[string]limits.Limit `json:"limits,omitempty"`
+	Limits []limits.Rlimit `json:"limits,omitempty"`
 	// Cgroup is /proc/[pid]/cgroup split into an array.
 	Cgroup []kernel.TaskCgroupEntry `json:"cgroup,omitempty"`
 	// Status is /proc/[pid]/status.
@@ -271,9 +284,9 @@ func getMappings(ctx context.Context, mm *mm.MemoryManager) []Mapping {
 	var maps []Mapping
 	mm.ReadMapsDataInto(ctx, func(start, end hostarch.Addr, permissions hostarch.AccessType, private string, offset uint64, devMajor, devMinor uint32, inode uint64, path string) {
 		maps = append(maps, Mapping{
-			Address: hostarch.AddrRange{
-				Start: start,
-				End:   end,
+			Address: Range{
+				Start: uint64(start),
+				End:   uint64(end),
 			},
 			Permissions: permissions,
 			Private:     private,
@@ -311,8 +324,8 @@ func Dump(t *kernel.Task, pid kernel.ThreadID, pidns *kernel.PIDNamespace) (Proc
 		FDs:       getFDs(ctx, t, pid),
 		StartTime: t.StartTime().Nanoseconds(),
 		Root:      getRoot(t, pid),
-		Limits: map[string]limits.Limit{
-			"RLIMIT_NOFILE": fdLimit,
+		Limits: []limits.Rlimit{
+			{Name: "RLIMIT_NOFILE", Limit: fdLimit},
 		},
 		// We don't need to worry about fake cgroup controllers as that is not
 		// supported in runsc.

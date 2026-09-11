@@ -2041,10 +2041,10 @@ func (c *Container) populateStats(event *boot.EventOut) {
 
 	var containerUsage uint64
 	var allContainersUsage uint64
-	for id, usage := range event.ContainerUsage {
-		allContainersUsage += usage
-		if id == c.ID {
-			containerUsage = usage
+	for _, u := range event.ContainerUsage {
+		allContainersUsage += u.CPU
+		if u.ContainerID == c.ID {
+			containerUsage = u.CPU
 		}
 	}
 

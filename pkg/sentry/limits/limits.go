@@ -155,6 +155,14 @@ type Limit struct {
 	Max uint64 `json:"max,omitempty"`
 }
 
+// Rlimit is one resource limit, named as Linux names the resource. A set of
+// them is a list rather than a map because it crosses the control plane, where
+// a field is an offset and a map has none.
+type Rlimit struct {
+	Name  string `json:"name"`
+	Limit Limit  `json:"limit"`
+}
+
 // LimitSet represents the Limits that correspond to each LimitType.
 //
 // +stateify savable

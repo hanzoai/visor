@@ -19,8 +19,7 @@
 package urpc
 
 import (
-	"bytes"
-	"encoding/json"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -29,6 +28,7 @@ import (
 	"runtime"
 	"time"
 
+	zap "github.com/zap-proto/go"
 	"gvisor.dev/gvisor/pkg/fd"
 	"gvisor.dev/gvisor/pkg/log"
 	"gvisor.dev/gvisor/pkg/sync"
@@ -39,11 +39,33 @@ import (
 // allows SCM_MAX_FD = 253 FDs to be donated in one sendmsg(2) call.
 const maxFiles = 128
 
+// maxMessage bounds the length a peer can ask us to allocate. The length lives
+// in the header of the message that declares it, so it is read before anything
+// has been verified.
+const maxMessage = 1 << 26
+
 // ErrTooManyFiles is returned when too many file descriptors are mapped.
 var ErrTooManyFiles = errors.New("too many files")
 
 // ErrUnknownMethod is returned when a method is not known.
 var ErrUnknownMethod = errors.New("unknown method")
+
+// ErrTooLarge is returned when a peer declares a message longer than
+// maxMessage.
+var ErrTooLarge = errors.New("message too large")
+
+// Wire is a payload that states its own bytes. //tools/zap writes one for
+// every payload a method carries, reading the offsets out of the type, so
+// nothing reflects over a payload while a call is being served.
+//
+// A payload that is nothing -- the *struct{} a method takes when it has no
+// argument or no result -- carries nothing and needs none. Anything else
+// without one fails the call naming the type, because an argument that
+// silently arrives empty is worse than one that does not arrive.
+type Wire interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+}
 
 // errStopped is an internal error indicating the server has been stopped.
 var errStopped = errors.New("stopped")
@@ -105,23 +127,55 @@ type filePayloader interface {
 	setFilePayload([]*os.File)
 }
 
-// clientCall is the client=>server method call on the client side.
-type clientCall struct {
-	Method string `json:"method"`
-	Arg    any    `json:"arg"`
+// Echo is a payload that goes out and comes back. It exists so that the
+// transport can be exercised against a layout //tools/zap wrote, the same way
+// every other payload crosses.
+type Echo struct {
+	Text   string
+	Number int
+	FilePayload
 }
 
-// serverCall is the client=>server method call on the server side.
-type serverCall struct {
-	Method string          `json:"method"`
-	Arg    json.RawMessage `json:"arg"`
+// Call is the client=>server method call. The argument crosses as the bytes
+// its own layout wrote, so one type serves both ends.
+type Call struct {
+	Method string
+	Arg    []byte
 }
 
-// callResult is the server=>client method call result.
-type callResult struct {
-	Success bool   `json:"success"`
-	Err     string `json:"err"`
-	Result  any    `json:"result"`
+// Result is the server=>client answer.
+type Result struct {
+	Success bool
+	Err     string
+	Result  []byte
+}
+
+// encode is what a value crosses as. A value that states no wire carries
+// nothing, which is right for the *struct{} that means "no payload" and an
+// error for anything else.
+func encode(v any) ([]byte, error) {
+	switch p := v.(type) {
+	case nil:
+		return nil, nil
+	case *struct{}:
+		return nil, nil
+	case Wire:
+		return p.MarshalZAP()
+	}
+	return nil, fmt.Errorf("urpc: %T states no wire; run make zap", v)
+}
+
+// decode fills v from the bytes that arrived.
+func decode(v any, data []byte) error {
+	switch p := v.(type) {
+	case nil:
+		return nil
+	case *struct{}:
+		return nil
+	case Wire:
+		return p.UnmarshalZAP(data)
+	}
+	return fmt.Errorf("urpc: %T states no wire; run make zap", v)
 }
 
 // registeredMethod is method registered with the server.
@@ -292,13 +346,13 @@ func (s *Server) lookup(method string) (registeredMethod, bool) {
 // handleOne handles a single call.
 func (s *Server) handleOne(client *unet.Socket) error {
 	// Unmarshal the call.
-	var c serverCall
+	var c Call
 	newFs, err := unmarshal(client, &c)
 	if err != nil {
 		// Client is dead.
 		return err
 	}
-	var result callResult
+	var result Result
 	log.Debugf("urpc: handling RPC call for method %s", c.Method)
 	defer logRequest(c, &result)
 	if s.afterRPCCallback != nil {
@@ -326,9 +380,9 @@ func (s *Server) handleOne(client *unet.Socket) error {
 		return marshal(client, &result, nil)
 	}
 
-	// Unmarshal the arguments now that we know the type.
+	// Read the argument now that we know the type.
 	na := reflect.New(rm.argType.Elem())
-	if err := json.Unmarshal(c.Arg, na.Interface()); err != nil {
+	if err := decode(na.Interface(), c.Arg); err != nil {
 		result.Err = err.Error()
 		return marshal(client, &result, nil)
 	}
@@ -357,13 +411,18 @@ func (s *Server) handleOne(client *unet.Socket) error {
 		}
 	}
 
-	// Marshal the result.
+	// Write the result.
+	data, err := encode(re.Interface())
+	if err != nil {
+		result.Err = err.Error()
+		return marshal(client, &result, nil)
+	}
 	result.Success = true
-	result.Result = re.Interface()
+	result.Result = data
 	return marshal(client, &result, fs)
 }
 
-func logRequest(c serverCall, result *callResult) {
+func logRequest(c Call, result *Result) {
 	if result.Err != "" {
 		log.Warningf("urpc: RPC call for method %s failed: %s", c.Method, result.Err)
 	} else if !result.Success {
@@ -545,12 +604,11 @@ func NewClient(socket *unet.Socket) *Client {
 	}
 }
 
-// marshal sends the given FD and json struct.
-func marshal(s *unet.Socket, v any, fs []*os.File) error {
-	// Marshal to a buffer.
-	data, err := json.Marshal(v)
+// marshal sends the given files and message.
+func marshal(s *unet.Socket, v Wire, fs []*os.File) error {
+	data, err := v.MarshalZAP()
 	if err != nil {
-		log.Warningf("urpc: error marshalling %s: %s", fmt.Sprintf("%v", v), err.Error())
+		log.Warningf("urpc: error marshalling %T: %s", v, err.Error())
 		return err
 	}
 
@@ -593,16 +651,19 @@ func marshal(s *unet.Socket, v any, fs []*os.File) error {
 	return nil
 }
 
-// unmarshal receives an FD (optional) and unmarshals the given struct.
-func unmarshal(s *unet.Socket, v any) ([]*os.File, error) {
-	// Receive a single byte.
+// unmarshal receives the files (optional) and reads the message that arrived.
+func unmarshal(s *unet.Socket, v Wire) ([]*os.File, error) {
+	// The header says how long the message is, and any files arrive with it:
+	// the control message rides the first recvmsg(2) and no other.
 	r := s.Reader(true)
 	r.EnableFDs(maxFiles)
-	firstByte := make([]byte, 1)
-
-	// Extract any FDs that may be there.
-	if _, err := r.ReadVec([][]byte{firstByte}); err != nil {
-		return nil, err
+	head := make([]byte, zap.HeaderSize)
+	for got := 0; got < len(head); {
+		n, err := r.ReadVec([][]byte{head[got:]})
+		got += n
+		if err != nil {
+			return nil, err
+		}
 	}
 	fds, err := r.ExtractFDs()
 	if err != nil {
@@ -614,24 +675,24 @@ func unmarshal(s *unet.Socket, v any) ([]*os.File, error) {
 		fs = append(fs, os.NewFile(uintptr(fd), "urpc"))
 	}
 
-	// Read the rest.
-	d := json.NewDecoder(io.MultiReader(bytes.NewBuffer(firstByte), s))
-	// urpc internally decodes / re-encodes the data with any as the
-	// intermediate type. We have to unmarshal integers to json.Number type
-	// instead of the default float type for those intermediate values, such
-	// that when they get re-encoded, their values are not printed out in
-	// floating-point formats such as 1e9, which could not be decoded to
-	// explicitly typed integers later.
-	d.UseNumber()
-	if err := d.Decode(v); err != nil {
-		log.Warningf("urpc: error decoding: %s", err.Error())
-		for _, f := range fs {
-			f.Close()
-		}
+	size := int(binary.LittleEndian.Uint32(head[12:16]))
+	if size < zap.HeaderSize || size > maxMessage {
+		closeAll(fs)
+		return nil, ErrTooLarge
+	}
+	data := make([]byte, size)
+	copy(data, head)
+	if _, err := io.ReadFull(s, data[len(head):]); err != nil {
+		closeAll(fs)
 		return nil, err
 	}
 
-	// All set.
+	if err := v.UnmarshalZAP(data); err != nil {
+		log.Warningf("urpc: error decoding: %s", err.Error())
+		closeAll(fs)
+		return nil, err
+	}
+
 	log.Debugf("urpc: unmarshal success.")
 	return fs, nil
 }
@@ -656,13 +717,17 @@ func (c *Client) Call(method string, arg any, result any) error {
 		}
 	}
 
-	// Marshal the data.
-	if err := marshal(c.Socket, &clientCall{Method: method, Arg: arg}, fs); err != nil {
+	// Write the argument.
+	data, err := encode(arg)
+	if err != nil {
+		return err
+	}
+	if err := marshal(c.Socket, &Call{Method: method, Arg: data}, fs); err != nil {
 		return err
 	}
 
 	// Wait for the response.
-	callR := callResult{Result: result}
+	var callR Result
 	newFs, err := unmarshal(c.Socket, &callR)
 	if err != nil {
 		return fmt.Errorf("urpc method %q failed: %v", method, err)
@@ -680,8 +745,7 @@ func (c *Client) Call(method string, arg any, result any) error {
 		return RemoteError{Message: callR.Err}
 	}
 
-	// All set.
-	return nil
+	return decode(result, callR.Result)
 }
 
 // Close closes the underlying socket.

@@ -296,8 +296,8 @@ type containerManager struct {
 }
 
 // StartRoot will start the root container process.
-func (cm *containerManager) StartRoot(cid *string, _ *struct{}) error {
-	log.Debugf("containerManager.StartRoot, cid: %s", *cid)
+func (cm *containerManager) StartRoot(args *control.ContainerArgs, _ *struct{}) error {
+	log.Debugf("containerManager.StartRoot, cid: %s", args.ContainerID)
 	cm.l.mu.Lock()
 	state := cm.l.state
 	cm.l.mu.Unlock()
@@ -318,9 +318,9 @@ func (cm *containerManager) onStart() error {
 }
 
 // Processes retrieves information about processes running in the sandbox.
-func (cm *containerManager) Processes(cid *string, out *[]*control.Process) error {
-	log.Debugf("containerManager.Processes, cid: %s", *cid)
-	return control.Processes(cm.l.k, *cid, out)
+func (cm *containerManager) Processes(args *control.ContainerArgs, out *ProcessesResult) error {
+	log.Debugf("containerManager.Processes, cid: %s", args.ContainerID)
+	return control.Processes(cm.l.k, args.ContainerID, &out.Processes)
 }
 
 // CreateArgs contains arguments to the Create method.
@@ -348,6 +348,41 @@ func (cm *containerManager) CreateSubcontainer(args *CreateArgs, _ *struct{}) er
 		}
 	}
 	return cm.l.createSubcontainer(args.CID, tty)
+}
+
+// ProcessesResult is the process listing of one container.
+type ProcessesResult struct {
+	Processes []*control.Process
+}
+
+// ExecResult is the pid of the process ExecuteAsync started.
+type ExecResult struct {
+	PID int32
+}
+
+// TraceSessionsResult is the set of trace sessions that exist.
+type TraceSessionsResult struct {
+	Sessions []seccheck.SessionConfig
+}
+
+// ProcfsResult is the procfs state of every process in the sandbox.
+type ProcfsResult struct {
+	Processes []procfs.ProcessProcfsDump
+}
+
+// RuntimeStateResult is the runtime state of one container.
+type RuntimeStateResult struct {
+	State ContainerRuntimeState
+}
+
+// DeleteTraceSessionArgs names the trace session to delete.
+type DeleteTraceSessionArgs struct {
+	Name string
+}
+
+// Stacks is a rendering of every goroutine in the sandbox.
+type Stacks struct {
+	Text string
 }
 
 // StartArgs contains arguments to the Start method.
@@ -523,21 +558,21 @@ func (cm *containerManager) StartSubcontainer(args *StartArgs, _ *struct{}) erro
 
 // DestroySubcontainer stops a container if it is still running and cleans up
 // its filesystem.
-func (cm *containerManager) DestroySubcontainer(cid *string, _ *struct{}) error {
-	log.Debugf("containerManager.DestroySubcontainer, cid: %s", *cid)
-	return cm.l.destroySubcontainer(*cid)
+func (cm *containerManager) DestroySubcontainer(args *control.ContainerArgs, _ *struct{}) error {
+	log.Debugf("containerManager.DestroySubcontainer, cid: %s", args.ContainerID)
+	return cm.l.destroySubcontainer(args.ContainerID)
 }
 
 // ExecuteAsync starts running a command on a created or running sandbox. It
 // returns the PID of the new process.
-func (cm *containerManager) ExecuteAsync(args *control.ExecArgs, pid *int32) error {
+func (cm *containerManager) ExecuteAsync(args *control.ExecArgs, out *ExecResult) error {
 	log.Debugf("containerManager.ExecuteAsync, cid: %s, args: %+v", args.ContainerID, args)
 	tgid, err := cm.l.executeAsync(args)
 	if err != nil {
 		log.Debugf("containerManager.ExecuteAsync failed, cid: %s, args: %+v, err: %v", args.ContainerID, args, err)
 		return err
 	}
-	*pid = int32(tgid)
+	out.PID = int32(tgid)
 	return nil
 }
 
@@ -929,10 +964,10 @@ func (cm *containerManager) Resume(_, _ *struct{}) error {
 }
 
 // Wait waits for the init process in the given container.
-func (cm *containerManager) Wait(cid *string, waitStatus *uint32) error {
-	log.Debugf("containerManager.Wait, cid: %s", *cid)
-	err := cm.l.waitContainer(*cid, waitStatus)
-	log.Debugf("containerManager.Wait returned, cid: %s, waitStatus: %#x, err: %v", *cid, *waitStatus, err)
+func (cm *containerManager) Wait(args *control.ContainerArgs, waitStatus *control.ExitStatus) error {
+	log.Debugf("containerManager.Wait, cid: %s", args.ContainerID)
+	err := cm.l.waitContainer(args.ContainerID, &waitStatus.Status)
+	log.Debugf("containerManager.Wait returned, cid: %s, waitStatus: %#x, err: %v", args.ContainerID, waitStatus.Status, err)
 	return err
 }
 
@@ -946,10 +981,10 @@ type WaitPIDArgs struct {
 }
 
 // WaitPID waits for the process with PID 'pid' in the sandbox.
-func (cm *containerManager) WaitPID(args *WaitPIDArgs, waitStatus *uint32) error {
+func (cm *containerManager) WaitPID(args *WaitPIDArgs, waitStatus *control.ExitStatus) error {
 	log.Debugf("containerManager.Wait, cid: %s, pid: %d", args.CID, args.PID)
-	err := cm.l.waitPID(kernel.ThreadID(args.PID), args.CID, waitStatus)
-	log.Debugf("containerManager.Wait, cid: %s, pid: %d, waitStatus: %#x, err: %v", args.CID, args.PID, *waitStatus, err)
+	err := cm.l.waitPID(kernel.ThreadID(args.PID), args.CID, &waitStatus.Status)
+	log.Debugf("containerManager.Wait, cid: %s, pid: %d, waitStatus: %#x, err: %v", args.CID, args.PID, waitStatus.Status, err)
 	return err
 }
 
@@ -1076,25 +1111,25 @@ func (cm *containerManager) CreateTraceSession(args *CreateTraceSessionArgs, _ *
 }
 
 // DeleteTraceSession deletes an existing trace session.
-func (cm *containerManager) DeleteTraceSession(name *string, _ *struct{}) error {
-	log.Debugf("containerManager.DeleteTraceSession: name: %q", *name)
-	return seccheck.Delete(*name)
+func (cm *containerManager) DeleteTraceSession(args *DeleteTraceSessionArgs, _ *struct{}) error {
+	log.Debugf("containerManager.DeleteTraceSession: name: %q", args.Name)
+	return seccheck.Delete(args.Name)
 }
 
 // ListTraceSessions lists trace sessions.
-func (cm *containerManager) ListTraceSessions(_ *struct{}, out *[]seccheck.SessionConfig) error {
+func (cm *containerManager) ListTraceSessions(_ *struct{}, out *TraceSessionsResult) error {
 	log.Debugf("containerManager.ListTraceSessions")
-	seccheck.List(out)
+	seccheck.List(&out.Sessions)
 	return nil
 }
 
 // ProcfsDump dumps procfs state of the sandbox.
-func (cm *containerManager) ProcfsDump(_ *struct{}, out *[]procfs.ProcessProcfsDump) error {
+func (cm *containerManager) ProcfsDump(_ *struct{}, out *ProcfsResult) error {
 	log.Debugf("containerManager.ProcfsDump")
 	ts := cm.l.k.TaskSet()
 	pidns := ts.Root
 	tgs := pidns.ThreadGroups()
-	*out = make([]procfs.ProcessProcfsDump, 0, len(tgs))
+	out.Processes = make([]procfs.ProcessProcfsDump, 0, len(tgs))
 	for _, tg := range tgs {
 		pid := pidns.IDOfThreadGroup(tg)
 		procDump, err := procfs.Dump(tg.Leader(), pid, pidns)
@@ -1102,7 +1137,7 @@ func (cm *containerManager) ProcfsDump(_ *struct{}, out *[]procfs.ProcessProcfsD
 			log.Warningf("skipping procfs dump for PID %s: %v", pid, err)
 			continue
 		}
-		*out = append(*out, procDump)
+		out.Processes = append(out.Processes, procDump)
 	}
 	return nil
 }
@@ -1202,9 +1237,9 @@ func (cm *containerManager) Mount(args *MountArgs, _ *struct{}) error {
 }
 
 // ContainerRuntimeState returns the runtime state of a container.
-func (cm *containerManager) ContainerRuntimeState(cid *string, state *ContainerRuntimeState) error {
-	log.Debugf("containerManager.ContainerRuntimeState: cid: %s", *cid)
-	*state = cm.l.containerRuntimeState(*cid)
+func (cm *containerManager) ContainerRuntimeState(args *control.ContainerArgs, out *RuntimeStateResult) error {
+	log.Debugf("containerManager.ContainerRuntimeState: cid: %s", args.ContainerID)
+	out.State = cm.l.containerRuntimeState(args.ContainerID)
 	return nil
 }
 

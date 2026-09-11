@@ -74,7 +74,7 @@ type Logging struct{}
 // Additionally, it may look odd that this is the only method
 // attached to an empty struct but this is also part of how
 // URPC dispatches.
-func (l *Logging) Change(args *LoggingArgs, code *int) error {
+func (l *Logging) Change(args *LoggingArgs, _ *struct{}) error {
 	if args.SetLevel {
 		// Logging uses an atomic for the level so this is thread safe.
 		log.SetLevel(args.Level)

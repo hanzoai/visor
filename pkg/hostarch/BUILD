@@ -43,10 +43,12 @@ go_library(
         "hostarch_x86.go",
         "memory_type.go",
         "sizes_util.go",
+        "zap.go",
     ],
     visibility = ["//:sandbox"],
     deps = [
         "//pkg/gohacks",
+        "@com_github_zap_proto_go//:go",
         "@org_golang_x_sys//unix:go_default_library",
     ],
 )

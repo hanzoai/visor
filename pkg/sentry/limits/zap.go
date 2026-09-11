@@ -18,6 +18,7 @@ package limits
 
 import (
 	"fmt"
+	"strings"
 
 	zap "github.com/zap-proto/go"
 )
@@ -60,5 +61,54 @@ func (x *Limit) UnmarshalZAP(data []byte) error {
 	o := m.Root()
 	x.Cur = uint64(o.Uint64(limitCurAt))
 	x.Max = uint64(o.Uint64(limitMaxAt))
+	return nil
+}
+
+// ---- Rlimit ------------------------------------------------------------
+
+const (
+	rlimitNameAt  = 0
+	rlimitLimitAt = 8
+	rlimitSize    = 16
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*Rlimit)(nil)
+
+// MarshalZAP writes Rlimit from constant offsets.
+func (x *Rlimit) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(rlimitSize + 256)
+	ob := b.StartObject(rlimitSize)
+	ob.SetText(rlimitNameAt, string(x.Name))
+	innerLimit, err := x.Limit.MarshalZAP()
+	if err != nil {
+		return nil, err
+	}
+	ob.SetBytes(rlimitLimitAt, innerLimit)
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads Rlimit out of the buffer that arrived.
+func (x *Rlimit) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("Rlimit: %w", err)
+	}
+	o := m.Root()
+	x.Name = string(strings.Clone(o.Text(rlimitNameAt)))
+	if raw := o.Bytes(rlimitLimitAt); len(raw) > 0 {
+		if err := x.Limit.UnmarshalZAP(raw); err != nil {
+			return err
+		}
+	}
 	return nil
 }

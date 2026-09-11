@@ -42,8 +42,8 @@ type NetworkInterface struct {
 type EventOut struct {
 	Event Event `json:"event"`
 
-	// ContainerUsage maps each container ID to its total CPU usage.
-	ContainerUsage map[string]uint64 `json:"containerUsage"`
+	// ContainerUsage is each container's total CPU time.
+	ContainerUsage []Usage `json:"containerUsage"`
 }
 
 // Event struct for encoding the event data to JSON. Corresponds to runc's
@@ -84,7 +84,7 @@ type Memory struct {
 	Swap      MemoryEntry       `json:"swap,omitempty"`
 	Kernel    MemoryEntry       `json:"kernel,omitempty"`
 	KernelTCP MemoryEntry       `json:"kernelTCP,omitempty"`
-	Raw       map[string]uint64 `json:"raw,omitempty"`
+	Raw       []Stat            `json:"raw,omitempty"`
 }
 
 // CPU contains stats on the CPU.
@@ -127,17 +127,48 @@ func (cm *containerManager) getUsageFromCgroups(file control.CgroupControlFile) 
 	return strconv.ParseUint(val, 10, 64)
 }
 
+// Stat is one named value out of a raw memory stat file.
+type Stat struct {
+	Name  string `json:"name"`
+	Value uint64 `json:"value"`
+}
+
+// Usage is one container's total CPU time.
+type Usage struct {
+	ContainerID string `json:"containerID"`
+	CPU         uint64 `json:"cpu"`
+}
+
+// CPU is the container's total CPU time, or zero when it has none.
+func (e *EventOut) CPU(containerID string) uint64 {
+	for _, u := range e.ContainerUsage {
+		if u.ContainerID == containerID {
+			return u.CPU
+		}
+	}
+	return 0
+}
+
+// usageOf restates a map of per-container CPU time as the list that crosses.
+func usageOf(m map[string]uint64) []Usage {
+	us := make([]Usage, 0, len(m))
+	for id, cpu := range m {
+		us = append(us, Usage{ContainerID: id, CPU: cpu})
+	}
+	return us
+}
+
 // Event gets the events from the container.
-func (cm *containerManager) Event(cid *string, out *EventOut) error {
+func (cm *containerManager) Event(args *control.ContainerArgs, out *EventOut) error {
 	*out = EventOut{
 		Event: Event{
-			ID:   *cid,
+			ID:   args.ContainerID,
 			Type: "stats",
 		},
 	}
 
 	// PIDs and check that container exists before going further.
-	pids, err := cm.l.pidsCount(*cid)
+	pids, err := cm.l.pidsCount(args.ContainerID)
 	if err != nil {
 		return err
 	}
@@ -157,7 +188,7 @@ func (cm *containerManager) Event(cid *string, out *EventOut) error {
 	// Memory usage.
 	memFile := control.CgroupControlFile{
 		Controller: "memory",
-		Path:       "/" + *cid,
+		Path:       "/" + args.ContainerID,
 		Name:       "memory.usage_in_bytes",
 	}
 	if cm.l.k.Cgroup2FS().EverMounted() {
@@ -181,7 +212,7 @@ func (cm *containerManager) Event(cid *string, out *EventOut) error {
 			// usage to the other containers. At least the sum of all
 			// containers will correctly account for the memory used by the
 			// sandbox.
-			if *cid == cm.l.sandboxID {
+			if args.ContainerID == cm.l.sandboxID {
 				memUsage = 0
 			} else {
 				memUsage = totalUsage / uint64(numContainers-1)
@@ -191,13 +222,14 @@ func (cm *containerManager) Event(cid *string, out *EventOut) error {
 	out.Event.Data.Memory.Usage.Usage = memUsage
 
 	// CPU usage by container.
-	out.ContainerUsage, err = cm.getCPUUsageFromCgroups()
+	cpu, err := cm.getCPUUsageFromCgroups()
+	out.ContainerUsage = usageOf(cpu)
 	if err != nil {
 		// Cgroups is not installed or there was an error to get usage
 		// from the cgroups. Fall back to the old method of getting the
 		// usage from the sentry and host cgroups.
 		log.Warningf("could not get container cpu usage from cgroups, error:  %v", err)
-		out.ContainerUsage = control.ContainerUsage(cm.l.k)
+		out.ContainerUsage = usageOf(control.ContainerUsage(cm.l.k))
 	}
 	return nil
 }

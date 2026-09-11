@@ -189,7 +189,7 @@ func (args *ExecArgs) String() string {
 }
 
 // Exec runs a new task.
-func (proc *Proc) Exec(args *ExecArgs, waitStatus *uint32) error {
+func (proc *Proc) Exec(args *ExecArgs, waitStatus *ExitStatus) error {
 	newTG, _, _, err := proc.execAsync(args, Env{})
 	if err != nil {
 		return err
@@ -197,7 +197,7 @@ func (proc *Proc) Exec(args *ExecArgs, waitStatus *uint32) error {
 
 	// Wait for completion.
 	newTG.WaitExited()
-	*waitStatus = uint32(newTG.ExitStatus())
+	waitStatus.Status = uint32(newTG.ExitStatus())
 	return nil
 }
 
@@ -361,21 +361,26 @@ type PsArgs struct {
 	JSON bool
 }
 
+// PsResult is the process table Ps renders.
+type PsResult struct {
+	Table string `json:"table"`
+}
+
 // Ps provides a process listing for the running kernel.
-func (proc *Proc) Ps(args *PsArgs, out *string) error {
+func (proc *Proc) Ps(args *PsArgs, out *PsResult) error {
 	var p []*Process
 	if e := Processes(proc.Kernel, "", &p); e != nil {
 		return e
 	}
 	if !args.JSON {
-		*out = ProcessListToTable(p)
-	} else {
-		s, e := ProcessListToJSON(p)
-		if e != nil {
-			return e
-		}
-		*out = s
+		out.Table = ProcessListToTable(p)
+		return nil
 	}
+	table, e := ProcessListToJSON(p)
+	if e != nil {
+		return e
+	}
+	out.Table = table
 	return nil
 }
 

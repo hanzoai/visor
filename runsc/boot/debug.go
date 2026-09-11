@@ -21,9 +21,8 @@ import (
 type debug struct {
 }
 
-// Stacks collects all sandbox stacks and copies them to 'stacks'.
-func (*debug) Stacks(_ *struct{}, stacks *string) error {
-	buf := log.Stacks(true)
-	*stacks = string(buf)
+// Stacks collects every goroutine stack in the sandbox.
+func (*debug) Stacks(_ *struct{}, out *Stacks) error {
+	out.Text = string(log.Stacks(true))
 	return nil
 }

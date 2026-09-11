@@ -211,7 +211,7 @@ governance-check: governance-regen ## Checks that the files derived from governa
 .PHONY: governance-check
 
 zap: ## Regenerates the ZAP wire of every urpc payload.
-	@for f in $$(git ls-files '*/zap.go' | grep -v '^tools/zap/'); do sed -i '/^package /q' $$f; done
+	@for f in $$(git ls-files --cached --others --exclude-standard '*/zap.go' | grep -v '^tools/zap/'); do sed -i '/^package /q' $$f; done
 	@$(call run,//tools/zap:zap)
 .PHONY: zap
 

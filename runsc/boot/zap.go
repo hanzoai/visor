@@ -25,9 +25,129 @@ import (
 
 	zap "github.com/zap-proto/go"
 	checkpoint "gvisor.dev/gvisor/pkg/sentry/checkpoint"
+	control "gvisor.dev/gvisor/pkg/sentry/control"
+	seccheck "gvisor.dev/gvisor/pkg/sentry/seccheck"
+	procfs "gvisor.dev/gvisor/runsc/boot/procfs"
 	config "gvisor.dev/gvisor/runsc/config"
 	specutils "gvisor.dev/gvisor/runsc/specutils"
 )
+
+// ---- CPU ---------------------------------------------------------------
+
+const (
+	cPUUsageAt = 0
+	cPUSize    = 8
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*CPU)(nil)
+
+// MarshalZAP writes CPU from constant offsets.
+func (x *CPU) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(cPUSize + 256)
+	ob := b.StartObject(cPUSize)
+	innerUsage, err := x.Usage.MarshalZAP()
+	if err != nil {
+		return nil, err
+	}
+	ob.SetBytes(cPUUsageAt, innerUsage)
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads CPU out of the buffer that arrived.
+func (x *CPU) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("CPU: %w", err)
+	}
+	o := m.Root()
+	if raw := o.Bytes(cPUUsageAt); len(raw) > 0 {
+		if err := x.Usage.UnmarshalZAP(raw); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ---- CPUUsage ----------------------------------------------------------
+
+const (
+	cPUUsageKernelAt = 0
+	cPUUsageUserAt   = 8
+	cPUUsageTotalAt  = 16
+	cPUUsagePerCPUAt = 24
+	cPUUsageSize     = 32
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*CPUUsage)(nil)
+
+// MarshalZAP writes CPUUsage from constant offsets.
+func (x *CPUUsage) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(cPUUsageSize + 256)
+	perCPUAt, perCPUN := 0, len(x.PerCPU)
+	if perCPUN > 0 {
+		var blob []byte
+		for i := range x.PerCPU {
+			var full [8]byte
+			binary.LittleEndian.PutUint64(full[:], uint64(x.PerCPU[i]))
+			enc := full[:8]
+			var n [4]byte
+			binary.LittleEndian.PutUint32(n[:], uint32(len(enc)))
+			blob = append(blob, n[:]...)
+			blob = append(blob, enc...)
+		}
+		perCPUAt = b.WriteBytes(blob)
+	}
+	ob := b.StartObject(cPUUsageSize)
+	ob.SetUint64(cPUUsageKernelAt, uint64(x.Kernel))
+	ob.SetUint64(cPUUsageUserAt, uint64(x.User))
+	ob.SetUint64(cPUUsageTotalAt, uint64(x.Total))
+	if perCPUN > 0 {
+		ob.SetList(cPUUsagePerCPUAt, perCPUAt, perCPUN)
+	}
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads CPUUsage out of the buffer that arrived.
+func (x *CPUUsage) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("CPUUsage: %w", err)
+	}
+	o := m.Root()
+	x.Kernel = uint64(o.Uint64(cPUUsageKernelAt))
+	x.User = uint64(o.Uint64(cPUUsageUserAt))
+	x.Total = uint64(o.Uint64(cPUUsageTotalAt))
+	if l := o.List(cPUUsagePerCPUAt); l.Len() > 0 {
+		rows := make([]uint64, l.Len())
+		for i := range rows {
+			var full [8]byte
+			copy(full[:], l.BytesAt(i))
+			rows[i] = uint64(binary.LittleEndian.Uint64(full[:]))
+		}
+		x.PerCPU = rows
+	}
+	return nil
+}
 
 // ---- CreateArgs --------------------------------------------------------
 
@@ -354,6 +474,208 @@ func (x *DefaultRoute) UnmarshalZAP(data []byte) error {
 		}
 	}
 	x.Name = string(strings.Clone(o.Text(defaultRouteNameAt)))
+	return nil
+}
+
+// ---- DeleteTraceSessionArgs --------------------------------------------
+
+const (
+	deleteTraceSessionArgsNameAt = 0
+	deleteTraceSessionArgsSize   = 8
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*DeleteTraceSessionArgs)(nil)
+
+// MarshalZAP writes DeleteTraceSessionArgs from constant offsets.
+func (x *DeleteTraceSessionArgs) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(deleteTraceSessionArgsSize + 256)
+	ob := b.StartObject(deleteTraceSessionArgsSize)
+	ob.SetText(deleteTraceSessionArgsNameAt, string(x.Name))
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads DeleteTraceSessionArgs out of the buffer that arrived.
+func (x *DeleteTraceSessionArgs) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("DeleteTraceSessionArgs: %w", err)
+	}
+	o := m.Root()
+	x.Name = string(strings.Clone(o.Text(deleteTraceSessionArgsNameAt)))
+	return nil
+}
+
+// ---- Event -------------------------------------------------------------
+
+const (
+	eventTypeAt = 0
+	eventIDAt   = 8
+	eventDataAt = 16
+	eventSize   = 24
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*Event)(nil)
+
+// MarshalZAP writes Event from constant offsets.
+func (x *Event) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(eventSize + 256)
+	ob := b.StartObject(eventSize)
+	ob.SetText(eventTypeAt, string(x.Type))
+	ob.SetText(eventIDAt, string(x.ID))
+	innerData, err := x.Data.MarshalZAP()
+	if err != nil {
+		return nil, err
+	}
+	ob.SetBytes(eventDataAt, innerData)
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads Event out of the buffer that arrived.
+func (x *Event) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("Event: %w", err)
+	}
+	o := m.Root()
+	x.Type = string(strings.Clone(o.Text(eventTypeAt)))
+	x.ID = string(strings.Clone(o.Text(eventIDAt)))
+	if raw := o.Bytes(eventDataAt); len(raw) > 0 {
+		if err := x.Data.UnmarshalZAP(raw); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ---- EventOut ----------------------------------------------------------
+
+const (
+	eventOutEventAt          = 0
+	eventOutContainerUsageAt = 8
+	eventOutSize             = 16
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*EventOut)(nil)
+
+// MarshalZAP writes EventOut from constant offsets.
+func (x *EventOut) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(eventOutSize + 256)
+	containerUsageAt, containerUsageN := 0, len(x.ContainerUsage)
+	if containerUsageN > 0 {
+		var blob []byte
+		for i := range x.ContainerUsage {
+			enc, err := x.ContainerUsage[i].MarshalZAP()
+			if err != nil {
+				return nil, err
+			}
+			var n [4]byte
+			binary.LittleEndian.PutUint32(n[:], uint32(len(enc)))
+			blob = append(blob, n[:]...)
+			blob = append(blob, enc...)
+		}
+		containerUsageAt = b.WriteBytes(blob)
+	}
+	ob := b.StartObject(eventOutSize)
+	innerEvent, err := x.Event.MarshalZAP()
+	if err != nil {
+		return nil, err
+	}
+	ob.SetBytes(eventOutEventAt, innerEvent)
+	if containerUsageN > 0 {
+		ob.SetList(eventOutContainerUsageAt, containerUsageAt, containerUsageN)
+	}
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads EventOut out of the buffer that arrived.
+func (x *EventOut) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("EventOut: %w", err)
+	}
+	o := m.Root()
+	if raw := o.Bytes(eventOutEventAt); len(raw) > 0 {
+		if err := x.Event.UnmarshalZAP(raw); err != nil {
+			return err
+		}
+	}
+	if l := o.List(eventOutContainerUsageAt); l.Len() > 0 {
+		rows := make([]Usage, l.Len())
+		for i := range rows {
+			if err := rows[i].UnmarshalZAP(l.BytesAt(i)); err != nil {
+				return err
+			}
+		}
+		x.ContainerUsage = rows
+	}
+	return nil
+}
+
+// ---- ExecResult --------------------------------------------------------
+
+const (
+	execResultPIDAt = 0
+	execResultSize  = 8
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*ExecResult)(nil)
+
+// MarshalZAP writes ExecResult from constant offsets.
+func (x *ExecResult) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(execResultSize + 256)
+	ob := b.StartObject(execResultSize)
+	ob.SetInt32(execResultPIDAt, int32(x.PID))
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads ExecResult out of the buffer that arrived.
+func (x *ExecResult) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("ExecResult: %w", err)
+	}
+	o := m.Root()
+	x.PID = int32(o.Int32(execResultPIDAt))
 	return nil
 }
 
@@ -815,6 +1137,163 @@ func (x *LoopbackLink) UnmarshalZAP(data []byte) error {
 	return nil
 }
 
+// ---- Memory ------------------------------------------------------------
+
+const (
+	memoryCacheAt     = 0
+	memoryUsageAt     = 8
+	memorySwapAt      = 16
+	memoryKernelAt    = 24
+	memoryKernelTCPAt = 32
+	memoryRawAt       = 40
+	memorySize        = 48
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*Memory)(nil)
+
+// MarshalZAP writes Memory from constant offsets.
+func (x *Memory) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(memorySize + 256)
+	rawAt, rawN := 0, len(x.Raw)
+	if rawN > 0 {
+		var blob []byte
+		for i := range x.Raw {
+			enc, err := x.Raw[i].MarshalZAP()
+			if err != nil {
+				return nil, err
+			}
+			var n [4]byte
+			binary.LittleEndian.PutUint32(n[:], uint32(len(enc)))
+			blob = append(blob, n[:]...)
+			blob = append(blob, enc...)
+		}
+		rawAt = b.WriteBytes(blob)
+	}
+	ob := b.StartObject(memorySize)
+	ob.SetUint64(memoryCacheAt, uint64(x.Cache))
+	innerUsage, err := x.Usage.MarshalZAP()
+	if err != nil {
+		return nil, err
+	}
+	ob.SetBytes(memoryUsageAt, innerUsage)
+	innerSwap, err := x.Swap.MarshalZAP()
+	if err != nil {
+		return nil, err
+	}
+	ob.SetBytes(memorySwapAt, innerSwap)
+	innerKernel, err := x.Kernel.MarshalZAP()
+	if err != nil {
+		return nil, err
+	}
+	ob.SetBytes(memoryKernelAt, innerKernel)
+	innerKernelTCP, err := x.KernelTCP.MarshalZAP()
+	if err != nil {
+		return nil, err
+	}
+	ob.SetBytes(memoryKernelTCPAt, innerKernelTCP)
+	if rawN > 0 {
+		ob.SetList(memoryRawAt, rawAt, rawN)
+	}
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads Memory out of the buffer that arrived.
+func (x *Memory) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("Memory: %w", err)
+	}
+	o := m.Root()
+	x.Cache = uint64(o.Uint64(memoryCacheAt))
+	if raw := o.Bytes(memoryUsageAt); len(raw) > 0 {
+		if err := x.Usage.UnmarshalZAP(raw); err != nil {
+			return err
+		}
+	}
+	if raw := o.Bytes(memorySwapAt); len(raw) > 0 {
+		if err := x.Swap.UnmarshalZAP(raw); err != nil {
+			return err
+		}
+	}
+	if raw := o.Bytes(memoryKernelAt); len(raw) > 0 {
+		if err := x.Kernel.UnmarshalZAP(raw); err != nil {
+			return err
+		}
+	}
+	if raw := o.Bytes(memoryKernelTCPAt); len(raw) > 0 {
+		if err := x.KernelTCP.UnmarshalZAP(raw); err != nil {
+			return err
+		}
+	}
+	if l := o.List(memoryRawAt); l.Len() > 0 {
+		rows := make([]Stat, l.Len())
+		for i := range rows {
+			if err := rows[i].UnmarshalZAP(l.BytesAt(i)); err != nil {
+				return err
+			}
+		}
+		x.Raw = rows
+	}
+	return nil
+}
+
+// ---- MemoryEntry -------------------------------------------------------
+
+const (
+	memoryEntryLimitAt   = 0
+	memoryEntryUsageAt   = 8
+	memoryEntryMaxAt     = 16
+	memoryEntryFailcntAt = 24
+	memoryEntrySize      = 32
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*MemoryEntry)(nil)
+
+// MarshalZAP writes MemoryEntry from constant offsets.
+func (x *MemoryEntry) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(memoryEntrySize + 256)
+	ob := b.StartObject(memoryEntrySize)
+	ob.SetUint64(memoryEntryLimitAt, uint64(x.Limit))
+	ob.SetUint64(memoryEntryUsageAt, uint64(x.Usage))
+	ob.SetUint64(memoryEntryMaxAt, uint64(x.Max))
+	ob.SetUint64(memoryEntryFailcntAt, uint64(x.Failcnt))
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads MemoryEntry out of the buffer that arrived.
+func (x *MemoryEntry) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("MemoryEntry: %w", err)
+	}
+	o := m.Root()
+	x.Limit = uint64(o.Uint64(memoryEntryLimitAt))
+	x.Usage = uint64(o.Uint64(memoryEntryUsageAt))
+	x.Max = uint64(o.Uint64(memoryEntryMaxAt))
+	x.Failcnt = uint64(o.Uint64(memoryEntryFailcntAt))
+	return nil
+}
+
 // ---- MountArgs ---------------------------------------------------------
 
 const (
@@ -914,6 +1393,109 @@ func (x *Neighbor) UnmarshalZAP(data []byte) error {
 	return nil
 }
 
+// ---- NetworkInterface --------------------------------------------------
+
+const (
+	networkInterfaceNameAt      = 0
+	networkInterfaceRxBytesAt   = 8
+	networkInterfaceRxPacketsAt = 16
+	networkInterfaceRxErrorsAt  = 24
+	networkInterfaceRxDroppedAt = 32
+	networkInterfaceTxBytesAt   = 40
+	networkInterfaceTxPacketsAt = 48
+	networkInterfaceTxErrorsAt  = 56
+	networkInterfaceTxDroppedAt = 64
+	networkInterfaceSize        = 72
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*NetworkInterface)(nil)
+
+// MarshalZAP writes NetworkInterface from constant offsets.
+func (x *NetworkInterface) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(networkInterfaceSize + 256)
+	ob := b.StartObject(networkInterfaceSize)
+	ob.SetText(networkInterfaceNameAt, string(x.Name))
+	ob.SetUint64(networkInterfaceRxBytesAt, uint64(x.RxBytes))
+	ob.SetUint64(networkInterfaceRxPacketsAt, uint64(x.RxPackets))
+	ob.SetUint64(networkInterfaceRxErrorsAt, uint64(x.RxErrors))
+	ob.SetUint64(networkInterfaceRxDroppedAt, uint64(x.RxDropped))
+	ob.SetUint64(networkInterfaceTxBytesAt, uint64(x.TxBytes))
+	ob.SetUint64(networkInterfaceTxPacketsAt, uint64(x.TxPackets))
+	ob.SetUint64(networkInterfaceTxErrorsAt, uint64(x.TxErrors))
+	ob.SetUint64(networkInterfaceTxDroppedAt, uint64(x.TxDropped))
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads NetworkInterface out of the buffer that arrived.
+func (x *NetworkInterface) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("NetworkInterface: %w", err)
+	}
+	o := m.Root()
+	x.Name = string(strings.Clone(o.Text(networkInterfaceNameAt)))
+	x.RxBytes = uint64(o.Uint64(networkInterfaceRxBytesAt))
+	x.RxPackets = uint64(o.Uint64(networkInterfaceRxPacketsAt))
+	x.RxErrors = uint64(o.Uint64(networkInterfaceRxErrorsAt))
+	x.RxDropped = uint64(o.Uint64(networkInterfaceRxDroppedAt))
+	x.TxBytes = uint64(o.Uint64(networkInterfaceTxBytesAt))
+	x.TxPackets = uint64(o.Uint64(networkInterfaceTxPacketsAt))
+	x.TxErrors = uint64(o.Uint64(networkInterfaceTxErrorsAt))
+	x.TxDropped = uint64(o.Uint64(networkInterfaceTxDroppedAt))
+	return nil
+}
+
+// ---- Pids --------------------------------------------------------------
+
+const (
+	pidsCurrentAt = 0
+	pidsLimitAt   = 8
+	pidsSize      = 16
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*Pids)(nil)
+
+// MarshalZAP writes Pids from constant offsets.
+func (x *Pids) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(pidsSize + 256)
+	ob := b.StartObject(pidsSize)
+	ob.SetUint64(pidsCurrentAt, uint64(x.Current))
+	ob.SetUint64(pidsLimitAt, uint64(x.Limit))
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads Pids out of the buffer that arrived.
+func (x *Pids) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("Pids: %w", err)
+	}
+	o := m.Root()
+	x.Current = uint64(o.Uint64(pidsCurrentAt))
+	x.Limit = uint64(o.Uint64(pidsLimitAt))
+	return nil
+}
+
 // ---- PortForwardOpts ---------------------------------------------------
 
 const (
@@ -966,6 +1548,137 @@ func (x *PortForwardOpts) UnmarshalZAP(data []byte) error {
 	return nil
 }
 
+// ---- ProcessesResult ---------------------------------------------------
+
+const (
+	processesResultProcessesAt = 0
+	processesResultSize        = 8
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*ProcessesResult)(nil)
+
+// MarshalZAP writes ProcessesResult from constant offsets.
+func (x *ProcessesResult) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(processesResultSize + 256)
+	processesAt, processesN := 0, len(x.Processes)
+	if processesN > 0 {
+		var blob []byte
+		for i := range x.Processes {
+			elem := x.Processes[i]
+			if elem == nil {
+				elem = new(control.Process)
+			}
+			enc, err := elem.MarshalZAP()
+			if err != nil {
+				return nil, err
+			}
+			var n [4]byte
+			binary.LittleEndian.PutUint32(n[:], uint32(len(enc)))
+			blob = append(blob, n[:]...)
+			blob = append(blob, enc...)
+		}
+		processesAt = b.WriteBytes(blob)
+	}
+	ob := b.StartObject(processesResultSize)
+	if processesN > 0 {
+		ob.SetList(processesResultProcessesAt, processesAt, processesN)
+	}
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads ProcessesResult out of the buffer that arrived.
+func (x *ProcessesResult) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("ProcessesResult: %w", err)
+	}
+	o := m.Root()
+	if l := o.List(processesResultProcessesAt); l.Len() > 0 {
+		rows := make([]*control.Process, l.Len())
+		for i := range rows {
+			rows[i] = new(control.Process)
+			if err := rows[i].UnmarshalZAP(l.BytesAt(i)); err != nil {
+				return err
+			}
+		}
+		x.Processes = rows
+	}
+	return nil
+}
+
+// ---- ProcfsResult ------------------------------------------------------
+
+const (
+	procfsResultProcessesAt = 0
+	procfsResultSize        = 8
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*ProcfsResult)(nil)
+
+// MarshalZAP writes ProcfsResult from constant offsets.
+func (x *ProcfsResult) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(procfsResultSize + 256)
+	processesAt, processesN := 0, len(x.Processes)
+	if processesN > 0 {
+		var blob []byte
+		for i := range x.Processes {
+			enc, err := x.Processes[i].MarshalZAP()
+			if err != nil {
+				return nil, err
+			}
+			var n [4]byte
+			binary.LittleEndian.PutUint32(n[:], uint32(len(enc)))
+			blob = append(blob, n[:]...)
+			blob = append(blob, enc...)
+		}
+		processesAt = b.WriteBytes(blob)
+	}
+	ob := b.StartObject(procfsResultSize)
+	if processesN > 0 {
+		ob.SetList(procfsResultProcessesAt, processesAt, processesN)
+	}
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads ProcfsResult out of the buffer that arrived.
+func (x *ProcfsResult) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("ProcfsResult: %w", err)
+	}
+	o := m.Root()
+	if l := o.List(procfsResultProcessesAt); l.Len() > 0 {
+		rows := make([]procfs.ProcessProcfsDump, l.Len())
+		for i := range rows {
+			if err := rows[i].UnmarshalZAP(l.BytesAt(i)); err != nil {
+				return err
+			}
+		}
+		x.Processes = rows
+	}
+	return nil
+}
+
 // ---- Route -------------------------------------------------------------
 
 const (
@@ -1015,6 +1728,44 @@ func (x *Route) UnmarshalZAP(data []byte) error {
 	}
 	x.Gateway = net.IP(append([]byte(nil), o.Bytes(routeGatewayAt)...))
 	x.MTU = uint32(o.Uint32(routeMTUAt))
+	return nil
+}
+
+// ---- RuntimeStateResult ------------------------------------------------
+
+const (
+	runtimeStateResultStateAt = 0
+	runtimeStateResultSize    = 8
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*RuntimeStateResult)(nil)
+
+// MarshalZAP writes RuntimeStateResult from constant offsets.
+func (x *RuntimeStateResult) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(runtimeStateResultSize + 256)
+	ob := b.StartObject(runtimeStateResultSize)
+	ob.SetInt64(runtimeStateResultStateAt, int64(x.State))
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads RuntimeStateResult out of the buffer that arrived.
+func (x *RuntimeStateResult) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("RuntimeStateResult: %w", err)
+	}
+	o := m.Root()
+	x.State = ContainerRuntimeState(o.Int64(runtimeStateResultStateAt))
 	return nil
 }
 
@@ -1103,6 +1854,44 @@ func (x *SignalArgs) UnmarshalZAP(data []byte) error {
 	x.Signo = int32(o.Int32(signalArgsSignoAt))
 	x.PID = int32(o.Int32(signalArgsPIDAt))
 	x.Mode = SignalDeliveryMode(o.Int64(signalArgsModeAt))
+	return nil
+}
+
+// ---- Stacks ------------------------------------------------------------
+
+const (
+	stacksTextAt = 0
+	stacksSize   = 8
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*Stacks)(nil)
+
+// MarshalZAP writes Stacks from constant offsets.
+func (x *Stacks) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(stacksSize + 256)
+	ob := b.StartObject(stacksSize)
+	ob.SetText(stacksTextAt, string(x.Text))
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads Stacks out of the buffer that arrived.
+func (x *Stacks) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("Stacks: %w", err)
+	}
+	o := m.Root()
+	x.Text = string(strings.Clone(o.Text(stacksTextAt)))
 	return nil
 }
 
@@ -1210,6 +1999,148 @@ func (x *StartArgs) UnmarshalZAP(data []byte) error {
 	return nil
 }
 
+// ---- Stat --------------------------------------------------------------
+
+const (
+	statNameAt  = 0
+	statValueAt = 8
+	statSize    = 16
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*Stat)(nil)
+
+// MarshalZAP writes Stat from constant offsets.
+func (x *Stat) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(statSize + 256)
+	ob := b.StartObject(statSize)
+	ob.SetText(statNameAt, string(x.Name))
+	ob.SetUint64(statValueAt, uint64(x.Value))
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads Stat out of the buffer that arrived.
+func (x *Stat) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("Stat: %w", err)
+	}
+	o := m.Root()
+	x.Name = string(strings.Clone(o.Text(statNameAt)))
+	x.Value = uint64(o.Uint64(statValueAt))
+	return nil
+}
+
+// ---- Stats -------------------------------------------------------------
+
+const (
+	statsCPUAt               = 0
+	statsMemoryAt            = 8
+	statsPidsAt              = 16
+	statsNetworkInterfacesAt = 24
+	statsSize                = 32
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*Stats)(nil)
+
+// MarshalZAP writes Stats from constant offsets.
+func (x *Stats) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(statsSize + 256)
+	networkInterfacesAt, networkInterfacesN := 0, len(x.NetworkInterfaces)
+	if networkInterfacesN > 0 {
+		var blob []byte
+		for i := range x.NetworkInterfaces {
+			elem := x.NetworkInterfaces[i]
+			if elem == nil {
+				elem = new(NetworkInterface)
+			}
+			enc, err := elem.MarshalZAP()
+			if err != nil {
+				return nil, err
+			}
+			var n [4]byte
+			binary.LittleEndian.PutUint32(n[:], uint32(len(enc)))
+			blob = append(blob, n[:]...)
+			blob = append(blob, enc...)
+		}
+		networkInterfacesAt = b.WriteBytes(blob)
+	}
+	ob := b.StartObject(statsSize)
+	innerCPU, err := x.CPU.MarshalZAP()
+	if err != nil {
+		return nil, err
+	}
+	ob.SetBytes(statsCPUAt, innerCPU)
+	innerMemory, err := x.Memory.MarshalZAP()
+	if err != nil {
+		return nil, err
+	}
+	ob.SetBytes(statsMemoryAt, innerMemory)
+	innerPids, err := x.Pids.MarshalZAP()
+	if err != nil {
+		return nil, err
+	}
+	ob.SetBytes(statsPidsAt, innerPids)
+	if networkInterfacesN > 0 {
+		ob.SetList(statsNetworkInterfacesAt, networkInterfacesAt, networkInterfacesN)
+	}
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads Stats out of the buffer that arrived.
+func (x *Stats) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("Stats: %w", err)
+	}
+	o := m.Root()
+	if raw := o.Bytes(statsCPUAt); len(raw) > 0 {
+		if err := x.CPU.UnmarshalZAP(raw); err != nil {
+			return err
+		}
+	}
+	if raw := o.Bytes(statsMemoryAt); len(raw) > 0 {
+		if err := x.Memory.UnmarshalZAP(raw); err != nil {
+			return err
+		}
+	}
+	if raw := o.Bytes(statsPidsAt); len(raw) > 0 {
+		if err := x.Pids.UnmarshalZAP(raw); err != nil {
+			return err
+		}
+	}
+	if l := o.List(statsNetworkInterfacesAt); l.Len() > 0 {
+		rows := make([]*NetworkInterface, l.Len())
+		for i := range rows {
+			rows[i] = new(NetworkInterface)
+			if err := rows[i].UnmarshalZAP(l.BytesAt(i)); err != nil {
+				return err
+			}
+		}
+		x.NetworkInterfaces = rows
+	}
+	return nil
+}
+
 // ---- Subnet ------------------------------------------------------------
 
 const (
@@ -1248,6 +2179,110 @@ func (x *Subnet) UnmarshalZAP(data []byte) error {
 	o := m.Root()
 	x.IP = net.IP(append([]byte(nil), o.Bytes(subnetIPAt)...))
 	x.Mask = net.IPMask(append([]byte(nil), o.Bytes(subnetMaskAt)...))
+	return nil
+}
+
+// ---- TraceSessionsResult -----------------------------------------------
+
+const (
+	traceSessionsResultSessionsAt = 0
+	traceSessionsResultSize       = 8
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*TraceSessionsResult)(nil)
+
+// MarshalZAP writes TraceSessionsResult from constant offsets.
+func (x *TraceSessionsResult) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(traceSessionsResultSize + 256)
+	sessionsAt, sessionsN := 0, len(x.Sessions)
+	if sessionsN > 0 {
+		var blob []byte
+		for i := range x.Sessions {
+			enc, err := x.Sessions[i].MarshalZAP()
+			if err != nil {
+				return nil, err
+			}
+			var n [4]byte
+			binary.LittleEndian.PutUint32(n[:], uint32(len(enc)))
+			blob = append(blob, n[:]...)
+			blob = append(blob, enc...)
+		}
+		sessionsAt = b.WriteBytes(blob)
+	}
+	ob := b.StartObject(traceSessionsResultSize)
+	if sessionsN > 0 {
+		ob.SetList(traceSessionsResultSessionsAt, sessionsAt, sessionsN)
+	}
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads TraceSessionsResult out of the buffer that arrived.
+func (x *TraceSessionsResult) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("TraceSessionsResult: %w", err)
+	}
+	o := m.Root()
+	if l := o.List(traceSessionsResultSessionsAt); l.Len() > 0 {
+		rows := make([]seccheck.SessionConfig, l.Len())
+		for i := range rows {
+			if err := rows[i].UnmarshalZAP(l.BytesAt(i)); err != nil {
+				return err
+			}
+		}
+		x.Sessions = rows
+	}
+	return nil
+}
+
+// ---- Usage -------------------------------------------------------------
+
+const (
+	usageContainerIDAt = 0
+	usageCPUAt         = 8
+	usageSize          = 16
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*Usage)(nil)
+
+// MarshalZAP writes Usage from constant offsets.
+func (x *Usage) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(usageSize + 256)
+	ob := b.StartObject(usageSize)
+	ob.SetText(usageContainerIDAt, string(x.ContainerID))
+	ob.SetUint64(usageCPUAt, uint64(x.CPU))
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads Usage out of the buffer that arrived.
+func (x *Usage) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("Usage: %w", err)
+	}
+	o := m.Root()
+	x.ContainerID = string(strings.Clone(o.Text(usageContainerIDAt)))
+	x.CPU = uint64(o.Uint64(usageCPUAt))
 	return nil
 }
 

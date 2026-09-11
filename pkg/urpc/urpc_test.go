@@ -25,29 +25,17 @@ import (
 type test struct {
 }
 
-type testArg struct {
-	StringArg string
-	IntArg    int
-	FilePayload
-}
-
-type testResult struct {
-	StringResult string
-	IntResult    int
-	FilePayload
-}
-
-func (t test) Func(a *testArg, r *testResult) error {
-	r.StringResult = a.StringArg
-	r.IntResult = a.IntArg
+func (t test) Func(a *Echo, r *Echo) error {
+	r.Text = a.Text
+	r.Number = a.Number
 	return nil
 }
 
-func (t test) Err(a *testArg, r *testResult) error {
+func (t test) Err(a *Echo, r *Echo) error {
 	return errors.New("test error")
 }
 
-func (t test) FailNoFile(a *testArg, r *testResult) error {
+func (t test) FailNoFile(a *Echo, r *Echo) error {
 	if a.Files == nil {
 		return errors.New("no file found")
 	}
@@ -55,12 +43,12 @@ func (t test) FailNoFile(a *testArg, r *testResult) error {
 	return nil
 }
 
-func (t test) SendFile(a *testArg, r *testResult) error {
+func (t test) SendFile(a *Echo, r *Echo) error {
 	r.Files = []*os.File{os.Stdin, os.Stdout, os.Stderr}
 	return nil
 }
 
-func (t test) TooManyFiles(a *testArg, r *testResult) error {
+func (t test) TooManyFiles(a *Echo, r *Echo) error {
 	for i := 0; i <= maxFiles; i++ {
 		r.Files = append(r.Files, os.Stdin)
 	}
@@ -90,21 +78,21 @@ func TestCall(t *testing.T) {
 	}
 	defer c.Close()
 
-	var r testResult
-	if err := c.Call("test.Func", &testArg{}, &r); err != nil {
+	var r Echo
+	if err := c.Call("test.Func", &Echo{}, &r); err != nil {
 		t.Errorf("basic call failed: %v", err)
-	} else if r.StringResult != "" || r.IntResult != 0 {
+	} else if r.Text != "" || r.Number != 0 {
 		t.Errorf("unexpected result, got %v expected zero value", r)
 	}
-	if err := c.Call("test.Func", &testArg{StringArg: "hello"}, &r); err != nil {
+	if err := c.Call("test.Func", &Echo{Text: "hello"}, &r); err != nil {
 		t.Errorf("basic call failed: %v", err)
-	} else if r.StringResult != "hello" {
-		t.Errorf("unexpected result, got %v expected hello", r.StringResult)
+	} else if r.Text != "hello" {
+		t.Errorf("unexpected result, got %v expected hello", r.Text)
 	}
-	if err := c.Call("test.Func", &testArg{IntArg: 1}, &r); err != nil {
+	if err := c.Call("test.Func", &Echo{Number: 1}, &r); err != nil {
 		t.Errorf("basic call failed: %v", err)
-	} else if r.IntResult != 1 {
-		t.Errorf("unexpected result, got %v expected 1", r.IntResult)
+	} else if r.Number != 1 {
+		t.Errorf("unexpected result, got %v expected 1", r.Number)
 	}
 }
 
@@ -115,8 +103,8 @@ func TestUnknownMethod(t *testing.T) {
 	}
 	defer c.Close()
 
-	var r testResult
-	if err := c.Call("test.Unknown", &testArg{}, &r); err == nil {
+	var r Echo
+	if err := c.Call("test.Unknown", &Echo{}, &r); err == nil {
 		t.Errorf("expected non-nil err, got nil")
 	} else if err.Error() != ErrUnknownMethod.Error() {
 		t.Errorf("expected test error, got %v", err)
@@ -130,8 +118,8 @@ func TestErr(t *testing.T) {
 	}
 	defer c.Close()
 
-	var r testResult
-	if err := c.Call("test.Err", &testArg{}, &r); err == nil {
+	var r Echo
+	if err := c.Call("test.Err", &Echo{}, &r); err == nil {
 		t.Errorf("expected non-nil err, got nil")
 	} else if err.Error() != "test error" {
 		t.Errorf("expected test error, got %v", err)
@@ -145,11 +133,11 @@ func TestSendFile(t *testing.T) {
 	}
 	defer c.Close()
 
-	var r testResult
-	if err := c.Call("test.FailNoFile", &testArg{}, &r); err == nil {
+	var r Echo
+	if err := c.Call("test.FailNoFile", &Echo{}, &r); err == nil {
 		t.Errorf("expected non-nil err, got nil")
 	}
-	if err := c.Call("test.FailNoFile", &testArg{FilePayload: FilePayload{Files: []*os.File{os.Stdin, os.Stdout, os.Stdin}}}, &r); err != nil {
+	if err := c.Call("test.FailNoFile", &Echo{FilePayload: FilePayload{Files: []*os.File{os.Stdin, os.Stdout, os.Stdin}}}, &r); err != nil {
 		t.Errorf("expected nil err, got %v", err)
 	}
 }
@@ -161,8 +149,8 @@ func TestRecvFile(t *testing.T) {
 	}
 	defer c.Close()
 
-	var r testResult
-	if err := c.Call("test.SendFile", &testArg{}, &r); err != nil {
+	var r Echo
+	if err := c.Call("test.SendFile", &Echo{}, &r); err != nil {
 		t.Errorf("expected nil err, got %v", err)
 	}
 	if r.Files == nil {
@@ -190,8 +178,8 @@ func TestTooManyFiles(t *testing.T) {
 	}
 	defer c.Close()
 
-	var r testResult
-	var a testArg
+	var r Echo
+	var a Echo
 	for i := 0; i <= maxFiles; i++ {
 		a.Files = append(a.Files, os.Stdin)
 	}
@@ -202,7 +190,7 @@ func TestTooManyFiles(t *testing.T) {
 	}
 
 	// Server-side error.
-	if err := c.Call("test.TooManyFiles", &testArg{}, &r); err == nil {
+	if err := c.Call("test.TooManyFiles", &Echo{}, &r); err == nil {
 		t.Errorf("expected non-nil err, got nil")
 	} else if err.Error() != "too many files" {
 		t.Errorf("expected too many files, got %v", err.Error())

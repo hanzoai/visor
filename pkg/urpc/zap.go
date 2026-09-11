@@ -20,9 +20,103 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"strings"
 
 	zap "github.com/zap-proto/go"
 )
+
+// ---- Call --------------------------------------------------------------
+
+const (
+	callMethodAt = 0
+	callArgAt    = 8
+	callSize     = 16
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*Call)(nil)
+
+// MarshalZAP writes Call from constant offsets.
+func (x *Call) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(callSize + 256)
+	ob := b.StartObject(callSize)
+	ob.SetText(callMethodAt, string(x.Method))
+	ob.SetBytes(callArgAt, []byte(x.Arg))
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads Call out of the buffer that arrived.
+func (x *Call) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("Call: %w", err)
+	}
+	o := m.Root()
+	x.Method = string(strings.Clone(o.Text(callMethodAt)))
+	x.Arg = []uint8(append([]byte(nil), o.Bytes(callArgAt)...))
+	return nil
+}
+
+// ---- Echo --------------------------------------------------------------
+
+const (
+	echoTextAt        = 0
+	echoNumberAt      = 8
+	echoFilePayloadAt = 16
+	echoSize          = 24
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*Echo)(nil)
+
+// MarshalZAP writes Echo from constant offsets.
+func (x *Echo) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(echoSize + 256)
+	ob := b.StartObject(echoSize)
+	ob.SetText(echoTextAt, string(x.Text))
+	ob.SetInt64(echoNumberAt, int64(x.Number))
+	innerFilePayload, err := x.FilePayload.MarshalZAP()
+	if err != nil {
+		return nil, err
+	}
+	ob.SetBytes(echoFilePayloadAt, innerFilePayload)
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads Echo out of the buffer that arrived.
+func (x *Echo) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("Echo: %w", err)
+	}
+	o := m.Root()
+	x.Text = string(strings.Clone(o.Text(echoTextAt)))
+	x.Number = int(o.Int64(echoNumberAt))
+	if raw := o.Bytes(echoFilePayloadAt); len(raw) > 0 {
+		if err := x.FilePayload.UnmarshalZAP(raw); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // ---- FilePayload -------------------------------------------------------
 
@@ -81,5 +175,49 @@ func (x *FilePayload) UnmarshalZAP(data []byte) error {
 		}
 		x.Files = rows
 	}
+	return nil
+}
+
+// ---- Result ------------------------------------------------------------
+
+const (
+	resultSuccessAt = 0
+	resultErrAt     = 8
+	resultResultAt  = 16
+	resultSize      = 24
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*Result)(nil)
+
+// MarshalZAP writes Result from constant offsets.
+func (x *Result) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(resultSize + 256)
+	ob := b.StartObject(resultSize)
+	ob.SetBool(resultSuccessAt, bool(x.Success))
+	ob.SetText(resultErrAt, string(x.Err))
+	ob.SetBytes(resultResultAt, []byte(x.Result))
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads Result out of the buffer that arrived.
+func (x *Result) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("Result: %w", err)
+	}
+	o := m.Root()
+	x.Success = bool(o.Bool(resultSuccessAt))
+	x.Err = string(strings.Clone(o.Text(resultErrAt)))
+	x.Result = []uint8(append([]byte(nil), o.Bytes(resultResultAt)...))
 	return nil
 }

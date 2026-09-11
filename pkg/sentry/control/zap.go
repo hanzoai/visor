@@ -27,6 +27,7 @@ import (
 	prometheus "gvisor.dev/gvisor/pkg/prometheus"
 	kernel "gvisor.dev/gvisor/pkg/sentry/kernel"
 	auth "gvisor.dev/gvisor/pkg/sentry/kernel/auth"
+	limits "gvisor.dev/gvisor/pkg/sentry/limits"
 )
 
 // ---- BlockProfileOpts --------------------------------------------------
@@ -848,6 +849,44 @@ func (x *ExecArgs) UnmarshalZAP(data []byte) error {
 		}
 	}
 	x.ContainerID = string(strings.Clone(o.Text(execArgsContainerIDAt)))
+	return nil
+}
+
+// ---- ExitStatus --------------------------------------------------------
+
+const (
+	exitStatusStatusAt = 0
+	exitStatusSize     = 8
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*ExitStatus)(nil)
+
+// MarshalZAP writes ExitStatus from constant offsets.
+func (x *ExitStatus) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(exitStatusSize + 256)
+	ob := b.StartObject(exitStatusSize)
+	ob.SetUint32(exitStatusStatusAt, uint32(x.Status))
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads ExitStatus out of the buffer that arrived.
+func (x *ExitStatus) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("ExitStatus: %w", err)
+	}
+	o := m.Root()
+	x.Status = uint32(o.Uint32(exitStatusStatusAt))
 	return nil
 }
 
@@ -1747,6 +1786,44 @@ func (x *PsArgs) UnmarshalZAP(data []byte) error {
 	return nil
 }
 
+// ---- PsResult ----------------------------------------------------------
+
+const (
+	psResultTableAt = 0
+	psResultSize    = 8
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*PsResult)(nil)
+
+// MarshalZAP writes PsResult from constant offsets.
+func (x *PsResult) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(psResultSize + 256)
+	ob := b.StartObject(psResultSize)
+	ob.SetText(psResultTableAt, string(x.Table))
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads PsResult out of the buffer that arrived.
+func (x *PsResult) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("PsResult: %w", err)
+	}
+	o := m.Root()
+	x.Table = string(strings.Clone(o.Text(psResultTableAt)))
+	return nil
+}
+
 // ---- ReadOpts ----------------------------------------------------------
 
 const (
@@ -1805,52 +1882,41 @@ func (x *ReadOpts) UnmarshalZAP(data []byte) error {
 	return nil
 }
 
-// ---- Rlimit ------------------------------------------------------------
+// ---- RunningResult -----------------------------------------------------
 
 const (
-	rlimitNameAt  = 0
-	rlimitLimitAt = 8
-	rlimitSize    = 16
+	runningResultRunningAt = 0
+	runningResultSize      = 8
 )
 
 var _ interface {
 	MarshalZAP() ([]byte, error)
 	UnmarshalZAP([]byte) error
-} = (*Rlimit)(nil)
+} = (*RunningResult)(nil)
 
-// MarshalZAP writes Rlimit from constant offsets.
-func (x *Rlimit) MarshalZAP() ([]byte, error) {
+// MarshalZAP writes RunningResult from constant offsets.
+func (x *RunningResult) MarshalZAP() ([]byte, error) {
 	if x == nil {
 		return nil, nil
 	}
-	b := zap.NewBuilder(rlimitSize + 256)
-	ob := b.StartObject(rlimitSize)
-	ob.SetText(rlimitNameAt, string(x.Name))
-	innerLimit, err := x.Limit.MarshalZAP()
-	if err != nil {
-		return nil, err
-	}
-	ob.SetBytes(rlimitLimitAt, innerLimit)
+	b := zap.NewBuilder(runningResultSize + 256)
+	ob := b.StartObject(runningResultSize)
+	ob.SetBool(runningResultRunningAt, bool(x.Running))
 	ob.FinishAsRoot()
 	return b.Finish(), nil
 }
 
-// UnmarshalZAP reads Rlimit out of the buffer that arrived.
-func (x *Rlimit) UnmarshalZAP(data []byte) error {
+// UnmarshalZAP reads RunningResult out of the buffer that arrived.
+func (x *RunningResult) UnmarshalZAP(data []byte) error {
 	if x == nil || len(data) == 0 {
 		return nil
 	}
 	m, err := zap.Parse(data)
 	if err != nil {
-		return fmt.Errorf("Rlimit: %w", err)
+		return fmt.Errorf("RunningResult: %w", err)
 	}
 	o := m.Root()
-	x.Name = string(strings.Clone(o.Text(rlimitNameAt)))
-	if raw := o.Bytes(rlimitLimitAt); len(raw) > 0 {
-		if err := x.Limit.UnmarshalZAP(raw); err != nil {
-			return err
-		}
-	}
+	x.Running = bool(o.Bool(runningResultRunningAt))
 	return nil
 }
 
@@ -2284,7 +2350,7 @@ func (x *StartContainerArgs) UnmarshalZAP(data []byte) error {
 		x.InitialCgroups = rows
 	}
 	if l := o.List(startContainerArgsLimitsAt); l.Len() > 0 {
-		rows := make([]Rlimit, l.Len())
+		rows := make([]limits.Rlimit, l.Len())
 		for i := range rows {
 			if err := rows[i].UnmarshalZAP(l.BytesAt(i)); err != nil {
 				return err

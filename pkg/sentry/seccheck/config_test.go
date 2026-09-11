@@ -192,9 +192,7 @@ func TestFailure(t *testing.T) {
 func TestExecveHashCacheConfig(t *testing.T) {
 	conf := SessionConfig{
 		Name: "Default",
-		Options: map[string]any{
-			"execve_hash_cache_capacity": 1024,
-		},
+		Options: Options{ExecveHashCacheCapacity: 1024},
 		Points: []PointConfig{
 			{
 				Name:           "sentry/execve",

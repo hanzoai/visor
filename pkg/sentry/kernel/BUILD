@@ -333,6 +333,7 @@ go_library(
         "user_counters_mutex.go",
         "uts_namespace.go",
         "vdso.go",
+        "zap.go",
     ],
     imports = [
         "gvisor.dev/gvisor/pkg/bpf",
@@ -341,7 +342,6 @@ go_library(
     marshal = True,
     visibility = ["//:sandbox"],
     deps = [
-        ":uncaught_signal_go_proto",
         "//pkg/abi",
         "//pkg/abi/linux",
         "//pkg/abi/linux/errno",
@@ -425,6 +425,8 @@ go_library(
         "//pkg/timing",
         "//pkg/usermem",
         "//pkg/waiter",
+        ":uncaught_signal_go_proto",
+        "@com_github_zap_proto_go//:go",
         "@org_golang_google_protobuf//proto:go_default_library",
         "@org_golang_x_sys//unix:go_default_library",
     ],

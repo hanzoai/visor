@@ -131,7 +131,7 @@ type StartContainerArgs struct {
 	InitialCgroups []Controller `json:"initial_cgroups"`
 
 	// Limits is the limit set for the process being executed.
-	Limits []Rlimit `json:"limits"`
+	Limits []limits.Rlimit `json:"limits"`
 
 	// If HOME environment variable is not provided, and this flag is set,
 	// then the HOME environment variable will be set inside the container
@@ -159,12 +159,6 @@ type StartContainerArgs struct {
 type Controller struct {
 	Name kernel.CgroupControllerType
 	Path string
-}
-
-// Rlimit is one resource limit, named as Linux names the resource.
-type Rlimit struct {
-	Name  string
-	Limit limits.Limit
 }
 
 // String formats the StartContainerArgs without the SecretEnvv field.
@@ -213,7 +207,7 @@ func (l *Lifecycle) updateContainerState(containerID string, newState containerS
 }
 
 // StartContainer will start a new container in the sandbox.
-func (l *Lifecycle) StartContainer(args *StartContainerArgs, _ *uint32) error {
+func (l *Lifecycle) StartContainer(args *StartContainerArgs, _ *struct{}) error {
 	timeRequested := time.Now()
 	timeRequestReceived := &timestamppb.Timestamp{
 		Seconds: timeRequested.Unix(),
@@ -452,8 +446,18 @@ type ContainerArgs struct {
 	ContainerID string `json:"container_id"`
 }
 
+// ExitStatus is the wait(2) status of a process that has finished.
+type ExitStatus struct {
+	Status uint32 `json:"status"`
+}
+
+// RunningResult answers whether a container is running.
+type RunningResult struct {
+	Running bool `json:"running"`
+}
+
 // GetExitStatus returns the container exit status if it has stopped.
-func (l *Lifecycle) GetExitStatus(args *ContainerArgs, status *uint32) error {
+func (l *Lifecycle) GetExitStatus(args *ContainerArgs, status *ExitStatus) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -466,10 +470,10 @@ func (l *Lifecycle) GetExitStatus(args *ContainerArgs, status *uint32) error {
 		return fmt.Errorf("container %q hasn't exited yet", args.ContainerID)
 	}
 
-	*status = uint32(c.tg.ExitStatus())
+	status.Status = uint32(c.tg.ExitStatus())
 	eventchannel.LogEmit(&pb.ContainerExitEvent{
 		ContainerId: args.ContainerID,
-		ExitStatus:  *status,
+		ExitStatus:  status.Status,
 	})
 	return nil
 }
@@ -513,7 +517,7 @@ func (l *Lifecycle) Reap(args *ContainerArgs, _ *struct{}) error {
 }
 
 // IsContainerRunning returns true if the container is running.
-func (l *Lifecycle) IsContainerRunning(args *ContainerArgs, isRunning *bool) error {
+func (l *Lifecycle) IsContainerRunning(args *ContainerArgs, isRunning *RunningResult) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -524,7 +528,7 @@ func (l *Lifecycle) IsContainerRunning(args *ContainerArgs, isRunning *bool) err
 		return nil
 	}
 
-	*isRunning = true
+	isRunning.Running = true
 	return nil
 }
 

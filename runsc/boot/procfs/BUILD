@@ -7,7 +7,10 @@ package(
 
 go_library(
     name = "procfs",
-    srcs = ["dump.go"],
+    srcs = [
+        "dump.go",
+        "zap.go",
+    ],
     visibility = ["//runsc:__subpackages__"],
     deps = [
         "//pkg/abi/linux",
@@ -19,5 +22,6 @@ go_library(
         "//pkg/sentry/limits",
         "//pkg/sentry/mm",
         "//pkg/sentry/vfs",
+        "@com_github_zap_proto_go//:go",
     ],
 )
