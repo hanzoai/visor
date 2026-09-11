@@ -56,17 +56,24 @@ jobs:
       #
       # bazelisk rather than a pinned bazel, because the repo states its own
       # version in .bazelversion and bazelisk is the one thing that reads it.
+      #
+      # Installed WITHOUT sudo, into a directory this job already owns. Runners
+      # execute inside the visor sandbox, where setuid is not honoured — sudo
+      # there fails with "nosuid", so any step that reaches for root fails
+      # before it does anything.
       - name: Install bazelisk
         run: |
           set -eu
-          # The RELEASE is pinned; the digest is not asserted here because a
-          # checksum nobody has verified out-of-band is theatre. What the build
-          # actually proves is the binary it produces: the version gate below
-          # rejects anything that does not report -visor.
-          curl -fsSL -o /tmp/bazelisk \
+          mkdir -p "$HOME/.local/bin"
+          # The RELEASE is pinned; no digest is asserted, because a checksum
+          # nobody verified out-of-band is theatre. What this lane actually
+          # proves is the binary it produces — the version gate below rejects
+          # anything that does not report -visor.
+          curl -fsSL -o "$HOME/.local/bin/bazel" \
             https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64
-          sudo install -m 0755 /tmp/bazelisk /usr/local/bin/bazel
-          bazel version
+          chmod 0755 "$HOME/.local/bin/bazel"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/bazel" version
 
       - name: Build
         run: |
