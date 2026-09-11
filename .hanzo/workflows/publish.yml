@@ -61,32 +61,37 @@ jobs:
           done
           ls -l
 
+      # Published to the forge, with the token the runner is already given —
+      # so this lane needs no secret anyone has to set, and cannot rot into a
+      # dead credential the way the cloud build lane did.
+      #
       # curl rather than a third-party action: one less dependency in the path
       # that publishes a security boundary.
       - name: Publish to the release
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -eu
-          api=https://api.github.com/repos/${{ github.repository }}
-          up=https://uploads.github.com/repos/${{ github.repository }}
-          auth="Authorization: Bearer $GH_TOKEN"
-          id=$(curl -fsSL -H "$auth" "$api/releases/tags/$TAG" | sed -n 's/^  "id": \([0-9]*\),/\1/p' | head -1)
+          api=${{ github.server_url }}/v1/repos/${{ github.repository }}
+          auth="Authorization: token $TOKEN"
+          id=$(curl -fsSL -H "$auth" "$api/releases/tags/$TAG" 2>/dev/null \
+               | sed -n 's/.*"id":[[:space:]]*\([0-9]*\).*/\1/p' | head -1 || true)
           if [ -z "$id" ]; then
-            id=$(curl -fsSL -X POST -H "$auth" "$api/releases" \
-                  -d "{\"tag_name\":\"$TAG\",\"name\":\"$TAG\"}" \
-                 | sed -n 's/^  "id": \([0-9]*\),/\1/p' | head -1)
+            id=$(curl -fsSL -X POST -H "$auth" -H 'Content-Type: application/json' \
+                   "$api/releases" -d "{\"tag_name\":\"$TAG\",\"name\":\"$TAG\"}" \
+                 | sed -n 's/.*"id":[[:space:]]*\([0-9]*\).*/\1/p' | head -1)
           fi
           [ -n "$id" ] || { echo "FATAL: no release id for $TAG"; exit 1; }
           cd bin
           for f in visor-${{ matrix.arch }} visor-${{ matrix.arch }}.sha512 \
                    containerd-shim-runsc-v1-${{ matrix.arch }} containerd-shim-runsc-v1-${{ matrix.arch }}.sha512; do
-            # Replace rather than append: a second run of the same tag must not
-            # leave two assets of one name behind.
+            # Replace rather than append: a second run of one tag must not leave
+            # two assets of one name, because install.sh pins by name.
             old=$(curl -fsSL -H "$auth" "$api/releases/$id/assets" \
-                  | awk -v n="$f" '/"id":/{i=$2} /"name":/{gsub(/[",]/,"");if($2==n){print i;exit}}' | tr -d ',')
-            [ -z "$old" ] || curl -fsS -X DELETE -H "$auth" "$api/releases/assets/$old"
-            curl -fsS -X POST -H "$auth" -H "Content-Type: application/octet-stream" \
-              --data-binary @"$f" "$up/releases/$id/assets?name=$f" > /dev/null
+                  | tr '}' '\n' | grep -F "\"name\":\"$f\"" \
+                  | sed -n 's/.*"id":[[:space:]]*\([0-9]*\).*/\1/p' | head -1 || true)
+            [ -z "$old" ] || curl -fsS -X DELETE -H "$auth" "$api/releases/$id/assets/$old" || true
+            curl -fsS -X POST -H "$auth" -F "attachment=@$f" \
+              "$api/releases/$id/assets?name=$f" > /dev/null
             echo "published $f"
           done
