@@ -16,6 +16,7 @@ package container
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -37,9 +38,7 @@ import (
 func remoteSinkConfig(endpoint string) seccheck.SinkConfig {
 	return seccheck.SinkConfig{
 		Name: "remote",
-		Config: map[string]any{
-			"endpoint": endpoint,
-		},
+		Config: json.RawMessage(fmt.Sprintf(`{"endpoint": %q}`, endpoint)),
 	}
 }
 

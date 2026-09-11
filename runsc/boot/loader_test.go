@@ -654,7 +654,7 @@ func TestNetworkConfig(t *testing.T) {
 				},
 				Routes: []Route{
 					{
-						Destination: net.IPNet{
+						Destination: Subnet{
 							IP:   net.IP{127, 0, 0, 0},
 							Mask: net.IPMask{255, 0, 0, 0},
 						},

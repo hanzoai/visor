@@ -562,7 +562,7 @@ func loopbackLink(conf *config.Config, iface net.Interface, addrs []net.Addr, di
 		dst := *ipNet
 		dst.IP = dst.IP.Mask(dst.Mask)
 		link.Routes = append(link.Routes, boot.Route{
-			Destination: dst,
+			Destination: boot.Subnet(dst),
 		})
 	}
 
@@ -608,7 +608,7 @@ func routesForIface(iface net.Interface, disableIPv6 bool) ([]boot.Route, *boot.
 					return nil, nil, nil, fmt.Errorf("more than one default route found %q, def: %+v, route: %+v", iface.Name, defv4, r)
 				}
 				defv4 = &boot.Route{
-					Destination: net.IPNet{
+					Destination: boot.Subnet{
 						IP:   net.IPv4zero,
 						Mask: net.IPMask(net.IPv4zero),
 					},
@@ -622,7 +622,7 @@ func routesForIface(iface net.Interface, disableIPv6 bool) ([]boot.Route, *boot.
 
 				if !disableIPv6 {
 					defv6 = &boot.Route{
-						Destination: net.IPNet{
+						Destination: boot.Subnet{
 							IP:   net.IPv6zero,
 							Mask: net.IPMask(net.IPv6zero),
 						},
@@ -642,7 +642,7 @@ func routesForIface(iface net.Interface, disableIPv6 bool) ([]boot.Route, *boot.
 		}
 		dst.IP = dst.IP.Mask(dst.Mask)
 		routes = append(routes, boot.Route{
-			Destination: dst,
+			Destination: boot.Subnet(dst),
 			Gateway:     r.Gw,
 			MTU:         mtu,
 		})

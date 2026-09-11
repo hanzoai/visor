@@ -6,6 +6,12 @@ licenses(["notice"])
 
 go_library(
     name = "checkpoint",
-    srcs = ["checkpoint.go"],
+    srcs = [
+        "checkpoint.go",
+        "zap.go",
+    ],
     visibility = ["//pkg/sentry:internal"],
+    deps = [
+        "@com_github_zap_proto_go//:go",
+    ],
 )

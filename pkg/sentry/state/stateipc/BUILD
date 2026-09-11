@@ -54,8 +54,12 @@ go_library(
         "server.go",
         "sourcefile_atomicptrmap_unsafe.go",
         "stateipc.go",
+        "zap.go",
     ],
-    visibility = ["//pkg/sentry:internal"],
+    visibility = [
+        "//pkg/sentry:internal",
+        "//tools/zap:__pkg__",
+    ],
     deps = [
         "//pkg/atomicbitops",
         "//pkg/cleanup",
@@ -69,6 +73,7 @@ go_library(
         "//pkg/sentry/state/stateio",
         "//pkg/sync",
         "//pkg/urpc",
+        "@com_github_zap_proto_go//:go",
         "@org_golang_x_sys//unix:go_default_library",
     ],
 )

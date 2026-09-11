@@ -7,10 +7,14 @@ package(
 
 go_library(
     name = "fd",
-    srcs = ["fd.go"],
+    srcs = [
+        "fd.go",
+        "zap.go",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         "//pkg/atomicbitops",
+        "@com_github_zap_proto_go//:go",
         "@org_golang_x_sys//unix:go_default_library",
     ],
 )

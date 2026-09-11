@@ -27,11 +27,13 @@ go_library(
         "strace.go",
         "tpuproxy.go",
         "vfs.go",
+        "zap.go",
     ],
     visibility = [
         "//pkg/test:__subpackages__",
         "//runsc:__subpackages__",
         "//test:__subpackages__",
+        "//tools/zap:__pkg__",
     ],
     deps = [
         "//pkg/abi",
@@ -162,6 +164,7 @@ go_library(
         "//runsc/version",
         "@com_github_moby_sys_capability//:go_default_library",
         "@com_github_opencontainers_runtime_spec//specs-go:go_default_library",
+        "@com_github_zap_proto_go//:go",
         "@org_golang_google_protobuf//proto:go_default_library",
         "@org_golang_x_sys//unix:go_default_library",
     ],

@@ -70,6 +70,8 @@ import (
 	"gvisor.dev/gvisor/runsc/starttime"
 
 	metricpb "gvisor.dev/gvisor/pkg/metric/metric_go_proto"
+
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -409,7 +411,10 @@ func New(conf *config.Config, args *Args) (*Sandbox, error) {
 		if err := s.call(boot.MetricsGetRegistered, nil, &registeredMetrics); err != nil {
 			return nil, fmt.Errorf("cannot get registered metrics: %v", err)
 		}
-		s.RegisteredMetrics = registeredMetrics.RegisteredMetrics
+		s.RegisteredMetrics = &metricpb.MetricRegistration{}
+		if err := proto.Unmarshal(registeredMetrics.Registration, s.RegisteredMetrics); err != nil {
+			return nil, fmt.Errorf("cannot read registered metrics: %w", err)
+		}
 	}
 
 	c.Release()
@@ -522,9 +527,14 @@ func (s *Sandbox) StartSubcontainer(spec *specs.Spec, conf *config.Config, cid s
 	}
 	payload.Files = append(payload.Files, goferFiles...)
 
+	doc, err := json.Marshal(spec)
+	if err != nil {
+		return fmt.Errorf("writing spec: %w", err)
+	}
+
 	// Start running the container.
 	args := boot.StartArgs{
-		Spec:                        spec,
+		Spec:                        doc,
 		Conf:                        conf,
 		CID:                         cid,
 		NumGoferFilestoreFDs:        len(goferFilestores),
@@ -671,9 +681,14 @@ func (s *Sandbox) RestoreSubcontainer(spec *specs.Spec, conf *config.Config, cid
 	}
 	payload.Files = append(payload.Files, goferFiles...)
 
+	doc, err := json.Marshal(spec)
+	if err != nil {
+		return fmt.Errorf("writing spec: %w", err)
+	}
+
 	// Start running the container.
 	args := boot.StartArgs{
-		Spec:                 spec,
+		Spec:                 doc,
 		Conf:                 conf,
 		CID:                  cid,
 		NumGoferFilestoreFDs: len(goferFilestoreFiles),
@@ -1673,7 +1688,7 @@ func (s *Sandbox) Checkpoint(conf *config.Config, cid string, imagePath string, 
 	log.Debugf("Checkpoint sandbox %q, imagePath %q, opts %+v", s.ID, imagePath, opts)
 
 	opt := control.SaveOpts{
-		Metadata:                       opts.Compression.ToMetadata(),
+		Metadata:                       control.Pairs(opts.Compression.ToMetadata()),
 		AppMFExcludeCommittedZeroPages: opts.ExcludeCommittedZeroPages,
 		Resume:                         opts.Resume,
 		CudaCheckpointPath:             opts.CudaCheckpointPath,

@@ -290,13 +290,13 @@ func defaultLoopbackLinks() []boot.LoopbackLink {
 			},
 			Routes: []boot.Route{
 				{
-					Destination: net.IPNet{
+					Destination: boot.Subnet{
 						IP:   net.IP{127, 0, 0, 0},
 						Mask: net.IPMask{255, 0, 0, 0},
 					},
 				},
 				{
-					Destination: net.IPNet{
+					Destination: boot.Subnet{
 						IP:   net.ParseIP("::1"),
 						Mask: net.IPMask{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255},
 					},
@@ -334,13 +334,13 @@ func TestCollectLinksAndRoutes_SingleInterface(t *testing.T) {
 			},
 			Routes: []boot.Route{
 				{
-					Destination: net.IPNet{
+					Destination: boot.Subnet{
 						IP:   net.IP{10, 0, 0, 0},
 						Mask: net.IPMask{255, 255, 255, 0},
 					},
 				},
 				{
-					Destination: net.IPNet{
+					Destination: boot.Subnet{
 						IP:   net.IP{192, 168, 1, 0},
 						Mask: net.IPMask{255, 255, 255, 0},
 					},
@@ -360,7 +360,7 @@ func TestCollectLinksAndRoutes_SingleInterface(t *testing.T) {
 	wantGW := boot.DefaultRoute{
 		Name: "testveth0",
 		Route: boot.Route{
-			Destination: net.IPNet{
+			Destination: boot.Subnet{
 				IP:   net.IPv4zero,
 				Mask: net.IPMask(net.IPv4zero),
 			},
@@ -404,13 +404,13 @@ func TestCollectLinksAndRoutes_LoopbackOnly(t *testing.T) {
 			},
 			Routes: []boot.Route{
 				{
-					Destination: net.IPNet{
+					Destination: boot.Subnet{
 						IP:   net.IP{127, 0, 0, 0},
 						Mask: net.IPMask{255, 0, 0, 0},
 					},
 				},
 				{
-					Destination: net.IPNet{
+					Destination: boot.Subnet{
 						IP:   net.ParseIP("::1"),
 						Mask: net.IPMask{255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255},
 					},
@@ -465,7 +465,7 @@ func TestCollectLinksAndRoutes_MultipleInterfaces(t *testing.T) {
 			},
 			Routes: []boot.Route{
 				{
-					Destination: net.IPNet{
+					Destination: boot.Subnet{
 						IP:   net.IP{10, 0, 0, 0},
 						Mask: net.IPMask{255, 255, 255, 0},
 					},
@@ -482,7 +482,7 @@ func TestCollectLinksAndRoutes_MultipleInterfaces(t *testing.T) {
 			},
 			Routes: []boot.Route{
 				{
-					Destination: net.IPNet{
+					Destination: boot.Subnet{
 						IP:   net.IP{192, 168, 1, 0},
 						Mask: net.IPMask{255, 255, 255, 0},
 					},
@@ -497,7 +497,7 @@ func TestCollectLinksAndRoutes_MultipleInterfaces(t *testing.T) {
 	wantGW := boot.DefaultRoute{
 		Name: "testveth0",
 		Route: boot.Route{
-			Destination: net.IPNet{
+			Destination: boot.Subnet{
 				IP:   net.IPv4zero,
 				Mask: net.IPMask(net.IPv4zero),
 			},
@@ -550,7 +550,7 @@ func TestCollectLinksAndRoutes_IPv6Disabled(t *testing.T) {
 			},
 			Routes: []boot.Route{
 				{
-					Destination: net.IPNet{
+					Destination: boot.Subnet{
 						IP:   net.IP{10, 0, 0, 0},
 						Mask: net.IPMask{255, 255, 255, 0},
 					},
@@ -575,7 +575,7 @@ func TestCollectLinksAndRoutes_IPv6Disabled(t *testing.T) {
 			},
 			Routes: []boot.Route{
 				{
-					Destination: net.IPNet{
+					Destination: boot.Subnet{
 						IP:   net.IP{127, 0, 0, 0},
 						Mask: net.IPMask{255, 0, 0, 0},
 					},
@@ -682,19 +682,19 @@ func TestCollectLinksAndRoutes_LoopbackExtraRoutes(t *testing.T) {
 			},
 			Routes: []boot.Route{
 				{
-					Destination: net.IPNet{
+					Destination: boot.Subnet{
 						IP:   net.IP{127, 0, 0, 0},
 						Mask: net.IPMask{255, 0, 0, 0},
 					},
 				},
 				{
-					Destination: net.IPNet{
+					Destination: boot.Subnet{
 						IP:   net.IPv6loopback,
 						Mask: net.CIDRMask(128, 128),
 					},
 				},
 				{
-					Destination: net.IPNet{
+					Destination: boot.Subnet{
 						IP:   net.IP{10, 88, 0, 0},
 						Mask: net.IPMask{255, 255, 0, 0},
 					},
@@ -718,7 +718,7 @@ func TestCollectLinksAndRoutes_LoopbackExtraRoutes(t *testing.T) {
 			},
 			Routes: []boot.Route{
 				{
-					Destination: net.IPNet{
+					Destination: boot.Subnet{
 						IP:   net.IP{10, 0, 0, 0},
 						Mask: net.IPMask{255, 255, 255, 0},
 					},

@@ -554,8 +554,11 @@ func lisafsNeededForDirectFSSuppression(spec *specs.Spec, mountHints *boot.PodMo
 func makeRPCMountOpener(goferToHostRPC *urpc.Client) sandboxsetup.MountOpener {
 	return func(m *specs.Mount, flags uint32) (*os.File, error) {
 		req := container.OpenMountArgs{
-			Mount: m,
-			Flags: flags,
+			Source:  m.Source,
+			Options: m.Options,
+			UIDs:    mappings(m.UIDMappings),
+			GIDs:    mappings(m.GIDMappings),
+			Flags:   flags,
 		}
 		var res container.OpenMountResult
 		if err := goferToHostRPC.Call("goferToHostRPC.OpenMount", &req, &res); err != nil {
@@ -563,6 +566,15 @@ func makeRPCMountOpener(goferToHostRPC *urpc.Client) sandboxsetup.MountOpener {
 		}
 		return res.Files[0], nil
 	}
+}
+
+// mappings restates an OCI id map as the RPC carries it.
+func mappings(ms []specs.LinuxIDMapping) []container.Mapping {
+	out := make([]container.Mapping, len(ms))
+	for i, m := range ms {
+		out[i] = container.Mapping{Container: m.ContainerID, Host: m.HostID, Size: m.Size}
+	}
+	return out
 }
 
 // setFlags sets sync FD flags on the given FlagSet.

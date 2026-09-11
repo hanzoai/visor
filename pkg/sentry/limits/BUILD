@@ -11,12 +11,14 @@ go_library(
         "context.go",
         "limits.go",
         "linux.go",
+        "zap.go",
     ],
     visibility = ["//:sandbox"],
     deps = [
         "//pkg/abi/linux",
         "//pkg/context",
         "//pkg/sync",
+        "@com_github_zap_proto_go//:go",
         "@org_golang_x_sys//unix:go_default_library",
     ],
 )

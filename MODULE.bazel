@@ -216,6 +216,7 @@ use_repo(
     "com_github_xeipuuv_gojsonreference",
     "com_github_xeipuuv_gojsonschema",
     "com_github_zap_proto_go",
+    "com_github_zap_proto_zip",
     "com_google_cloud_go",
     "com_google_cloud_go_auth",
     "com_google_cloud_go_auth_oauth2adapt",
@@ -256,7 +257,6 @@ use_repo(
     "org_uber_go_atomic",
     "org_uber_go_multierr",
 )
-
 go_deps.module(
     path = "cloud.google.com/go/auth",
     sum = "h1:mFWNQ2FEVWAliEQWpAdH80omXFokmrnbDhUS9cBywsI=",

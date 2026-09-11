@@ -27,6 +27,7 @@ go_library(
         "seccheck.go",
         "seqatomic_sinkslice_unsafe.go",
         "syscall.go",
+        "zap.go",
     ],
     visibility = ["//:sandbox"],
     deps = [
@@ -43,6 +44,7 @@ go_library(
         "//pkg/sentry/ktime",
         "//pkg/sentry/seccheck/points:points_go_proto",
         "//pkg/sync",
+        "@com_github_zap_proto_go//:go",
         "@org_golang_google_protobuf//proto:go_default_library",
     ],
 )

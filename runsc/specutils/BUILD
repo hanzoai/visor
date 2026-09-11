@@ -17,6 +17,7 @@ go_library(
         "rdma.go",
         "restore.go",
         "specutils.go",
+        "zap.go",
     ],
     visibility = ["//:sandbox"],
     deps = [
@@ -32,8 +33,9 @@ go_library(
         "@com_github_cenkalti_backoff//:go_default_library",
         "@com_github_moby_sys_capability//:go_default_library",
         "@com_github_mohae_deepcopy//:go_default_library",
-        "@com_github_opencontainers_runtime_spec//specs-go:go_default_library",
         "@com_github_opencontainers_runtime_spec//specs-go/features:go_default_library",
+        "@com_github_opencontainers_runtime_spec//specs-go:go_default_library",
+        "@com_github_zap_proto_go//:go",
         "@org_golang_x_sys//unix:go_default_library",
     ],
 )

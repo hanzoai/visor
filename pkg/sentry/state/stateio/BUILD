@@ -20,6 +20,7 @@ go_library(
         "stateio_impl_util.go",
         "stateio_util.go",
         "stateio_util_unsafe.go",
+        "zap.go",
     ],
     visibility = ["//pkg/sentry:internal"],
     deps = [
@@ -32,6 +33,7 @@ go_library(
         "//pkg/sentry/hostfd",
         "//pkg/sentry/memmap",
         "//pkg/sync",
+        "@com_github_zap_proto_go//:go",
         "@org_golang_x_sys//unix:go_default_library",
     ],
 )

@@ -15,6 +15,7 @@
 package boot
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -351,8 +352,10 @@ func (cm *containerManager) CreateSubcontainer(args *CreateArgs, _ *struct{}) er
 
 // StartArgs contains arguments to the Start method.
 type StartArgs struct {
-	// Spec is the spec of the container to start.
-	Spec *specs.Spec
+	// Spec is the OCI runtime spec of the container to start, as the bytes it
+	// was read from. The spec belongs to another module and cannot state its
+	// own wire; it is a document, and it crosses as itself.
+	Spec []byte
 
 	// Config is the runsc-specific configuration for the sandbox.
 	Conf *config.Config
@@ -383,6 +386,18 @@ type StartArgs struct {
 	urpc.FilePayload
 }
 
+// spec reads the OCI runtime spec the caller sent.
+func (a *StartArgs) spec() (*specs.Spec, error) {
+	if len(a.Spec) == 0 {
+		return nil, errors.New("start arguments missing spec")
+	}
+	var spec specs.Spec
+	if err := json.Unmarshal(a.Spec, &spec); err != nil {
+		return nil, fmt.Errorf("reading spec: %w", err)
+	}
+	return &spec, nil
+}
+
 // StartSubcontainer runs a created container within a sandbox.
 func (cm *containerManager) StartSubcontainer(args *StartArgs, _ *struct{}) error {
 	// Validate arguments.
@@ -390,8 +405,9 @@ func (cm *containerManager) StartSubcontainer(args *StartArgs, _ *struct{}) erro
 		return errors.New("start missing arguments")
 	}
 	log.Debugf("containerManager.StartSubcontainer, cid: %s, args: %+v", args.CID, args)
-	if args.Spec == nil {
-		return errors.New("start arguments missing spec")
+	spec, err := args.spec()
+	if err != nil {
+		return err
 	}
 	if args.Conf == nil {
 		return errors.New("start arguments missing config")
@@ -416,7 +432,7 @@ func (cm *containerManager) StartSubcontainer(args *StartArgs, _ *struct{}) erro
 	if args.IsDevIoFilePresent {
 		expectedFDs++
 	}
-	if !args.Spec.Process.Terminal {
+	if !spec.Process.Terminal {
 		expectedFDs += 3
 	}
 	if args.IsRootfsUpperTarFilePresent {
@@ -430,11 +446,11 @@ func (cm *containerManager) StartSubcontainer(args *StartArgs, _ *struct{}) erro
 	}
 
 	// All validation passed, logs the spec for debugging.
-	specutils.LogSpecDebug(args.Spec, args.Conf.OCISeccomp)
+	specutils.LogSpecDebug(spec, args.Conf.OCISeccomp)
 
 	goferFiles := args.Files
 	var stdios []*fd.FD
-	if !args.Spec.Process.Terminal {
+	if !spec.Process.Terminal {
 		// When not using a terminal, stdios come as the first 3 files in the
 		// payload.
 		var err error
@@ -497,7 +513,7 @@ func (cm *containerManager) StartSubcontainer(args *StartArgs, _ *struct{}) erro
 		}
 	}()
 
-	if err := cm.l.startSubcontainer(args.Spec, args.Conf, args.CID, stdios, goferFDs, goferFilestoreFDs, devGoferFD, args.GoferMountConfs, rootfsUpperTarFD); err != nil {
+	if err := cm.l.startSubcontainer(spec, args.Conf, args.CID, stdios, goferFDs, goferFilestoreFDs, devGoferFD, args.GoferMountConfs, rootfsUpperTarFD); err != nil {
 		log.Debugf("containerManager.StartSubcontainer failed, cid: %s, args: %+v, err: %v", args.CID, args, err)
 		return err
 	}
@@ -825,8 +841,9 @@ func (cm *containerManager) RestoreSubcontainer(args *StartArgs, _ *struct{}) (r
 	}()
 
 	// Validate arguments.
-	if args.Spec == nil {
-		return errors.New("start arguments missing spec")
+	spec, err := args.spec()
+	if err != nil {
+		return err
 	}
 	if args.Conf == nil {
 		return errors.New("start arguments missing config")
@@ -839,7 +856,7 @@ func (cm *containerManager) RestoreSubcontainer(args *StartArgs, _ *struct{}) (r
 	if args.IsDevIoFilePresent {
 		expectedFDs++
 	}
-	if !args.Spec.Process.Terminal {
+	if !spec.Process.Terminal {
 		expectedFDs += 3
 	}
 	if args.IsRootfsUpperTarFilePresent {
@@ -850,11 +867,11 @@ func (cm *containerManager) RestoreSubcontainer(args *StartArgs, _ *struct{}) (r
 	}
 
 	// All validation passed, logs the spec for debugging.
-	specutils.LogSpecDebug(args.Spec, args.Conf.OCISeccomp)
+	specutils.LogSpecDebug(spec, args.Conf.OCISeccomp)
 
 	goferFiles := args.Files
 	var stdios []*fd.FD
-	if !args.Spec.Process.Terminal {
+	if !spec.Process.Terminal {
 		// When not using a terminal, stdios come as the first 3 files in the
 		// payload.
 		var err error
@@ -890,7 +907,7 @@ func (cm *containerManager) RestoreSubcontainer(args *StartArgs, _ *struct{}) (r
 		return fmt.Errorf("error dup'ing gofer files: %w", err)
 	}
 
-	err = cm.restorer.restoreSubcontainer(args.Spec, args.Conf, cm.l, args.CID, stdios, goferFDs, goferFilestoreFDs, devGoferFD, args.GoferMountConfs)
+	err = cm.restorer.restoreSubcontainer(spec, args.Conf, cm.l, args.CID, stdios, goferFDs, goferFilestoreFDs, devGoferFD, args.GoferMountConfs)
 	if err != nil {
 		log.Debugf("containerManager.RestoreSubcontainer failed, cid: %s, args: %+v, err: %v", args.CID, args, err)
 		return err

@@ -22,16 +22,41 @@ import (
 	"sync"
 	"syscall"
 
-	specs "github.com/opencontainers/runtime-spec/specs-go"
 	"golang.org/x/sys/unix"
 	"gvisor.dev/gvisor/pkg/urpc"
-	"gvisor.dev/gvisor/runsc/specutils"
 )
 
-// OpenMountArgs represents a mount to be opened along with its flags.
+// OpenMountArgs is one mount source for the host to open on the gofer's
+// behalf. It states the mount in this package because the RPC carries it: the
+// OCI type it comes from belongs to another module, and a type from another
+// module cannot state its own wire.
 type OpenMountArgs struct {
-	Mount *specs.Mount
+	// Source is the path to open.
+	Source string
+
+	// Options are the mount options the OCI spec gave.
+	Options []string
+
+	// UIDs and GIDs are the mount's id maps.
+	UIDs []Mapping
+	GIDs []Mapping
+
+	// Flags are the Linux mount flags.
 	Flags uint32
+}
+
+// Mapping is one id range: Size ids starting at Host stand for Size ids
+// starting at Container.
+type Mapping struct {
+	Container uint32
+	Host      uint32
+	Size      uint32
+}
+
+// mapped reports a source the host must open through an id-mapped user
+// namespace, which is what carrying both maps means.
+func (a *OpenMountArgs) mapped() bool {
+	return len(a.UIDs) > 0 && len(a.GIDs) > 0
 }
 
 type openMountRequest struct {
@@ -54,12 +79,12 @@ type OpenMountResult struct {
 	urpc.FilePayload
 }
 
-func createIDMappedUserNS(uidMappings, gidMappings []specs.LinuxIDMapping) (*os.File, error) {
+func createIDMappedUserNS(uidMappings, gidMappings []Mapping) (*os.File, error) {
 	var sysUIDMaps []syscall.SysProcIDMap
 	for _, m := range uidMappings {
 		sysUIDMaps = append(sysUIDMaps, syscall.SysProcIDMap{
-			ContainerID: int(m.ContainerID),
-			HostID:      int(m.HostID),
+			ContainerID: int(m.Container),
+			HostID:      int(m.Host),
 			Size:        int(m.Size),
 		})
 	}
@@ -67,8 +92,8 @@ func createIDMappedUserNS(uidMappings, gidMappings []specs.LinuxIDMapping) (*os.
 	var sysGIDMaps []syscall.SysProcIDMap
 	for _, m := range gidMappings {
 		sysGIDMaps = append(sysGIDMaps, syscall.SysProcIDMap{
-			ContainerID: int(m.ContainerID),
-			HostID:      int(m.HostID),
+			ContainerID: int(m.Container),
+			HostID:      int(m.Host),
 			Size:        int(m.Size),
 		})
 	}
@@ -120,7 +145,7 @@ func createIDMappedUserNS(uidMappings, gidMappings []specs.LinuxIDMapping) (*os.
 }
 
 func openIDMappedMount(req *OpenMountArgs) (*os.File, error) {
-	usernsFD, err := createIDMappedUserNS(req.Mount.UIDMappings, req.Mount.GIDMappings)
+	usernsFD, err := createIDMappedUserNS(req.UIDs, req.GIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -131,13 +156,13 @@ func openIDMappedMount(req *OpenMountArgs) (*os.File, error) {
 		openTreeFlags |= unix.AT_RECURSIVE
 	}
 
-	fd, err := unix.OpenTree(unix.AT_FDCWD, req.Mount.Source, openTreeFlags)
+	fd, err := unix.OpenTree(unix.AT_FDCWD, req.Source, openTreeFlags)
 	if err != nil {
-		return nil, fmt.Errorf("open_tree(%q) failed: %w", req.Mount.Source, err)
+		return nil, fmt.Errorf("open_tree(%q) failed: %w", req.Source, err)
 	}
 
 	setattrFlags := uint(unix.AT_EMPTY_PATH)
-	if slices.Contains(req.Mount.Options, "ridmap") {
+	if slices.Contains(req.Options, "ridmap") {
 		setattrFlags |= unix.AT_RECURSIVE
 	}
 
@@ -148,10 +173,10 @@ func openIDMappedMount(req *OpenMountArgs) (*os.File, error) {
 
 	if err := unix.MountSetattr(fd, "", setattrFlags, attr); err != nil {
 		unix.Close(fd)
-		return nil, fmt.Errorf("mount_setattr(%q) failed: %w", req.Mount.Source, err)
+		return nil, fmt.Errorf("mount_setattr(%q) failed: %w", req.Source, err)
 	}
 
-	return os.NewFile(uintptr(fd), req.Mount.Source), nil
+	return os.NewFile(uintptr(fd), req.Source), nil
 }
 
 func (rpc *goferToHostRPC) handleRequest(req *openMountRequest) {
@@ -160,10 +185,10 @@ func (rpc *goferToHostRPC) handleRequest(req *openMountRequest) {
 	var fd *os.File
 	var err error
 
-	if specutils.IsIDMappedMount(*req.args.Mount) {
+	if req.args.mapped() {
 		fd, err = openIDMappedMount(req.args)
 	} else {
-		fd, err = os.OpenFile(req.args.Mount.Source, unix.O_PATH|unix.O_CLOEXEC, 0)
+		fd, err = os.OpenFile(req.args.Source, unix.O_PATH|unix.O_CLOEXEC, 0)
 	}
 	if err != nil {
 		req.done <- err

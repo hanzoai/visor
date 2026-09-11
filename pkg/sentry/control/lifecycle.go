@@ -128,10 +128,10 @@ type StartContainerArgs struct {
 	ContainerID string `json:"container_id"`
 
 	// InitialCgroups is the set of cgroup controllers container needs to be initialised to.
-	InitialCgroups map[kernel.CgroupControllerType]string `json:"initial_cgroups"`
+	InitialCgroups []Controller `json:"initial_cgroups"`
 
 	// Limits is the limit set for the process being executed.
-	Limits map[string]limits.Limit `json:"limits"`
+	Limits []Rlimit `json:"limits"`
 
 	// If HOME environment variable is not provided, and this flag is set,
 	// then the HOME environment variable will be set inside the container
@@ -152,6 +152,19 @@ type StartContainerArgs struct {
 
 	// FilePayload determines the files to give to the new process.
 	urpc.FilePayload
+}
+
+// Controller names one cgroup controller and the path, relative to it, that
+// the container starts in.
+type Controller struct {
+	Name kernel.CgroupControllerType
+	Path string
+}
+
+// Rlimit is one resource limit, named as Linux names the resource.
+type Rlimit struct {
+	Name  string
+	Limit limits.Limit
 }
 
 // String formats the StartContainerArgs without the SecretEnvv field.
@@ -239,12 +252,12 @@ func (l *Lifecycle) StartContainer(args *StartContainerArgs, _ *uint32) error {
 	if err != nil {
 		return fmt.Errorf("error creating default limit set: %w", err)
 	}
-	for name, limit := range args.Limits {
-		lt, ok := limits.FromLinuxResourceName[name]
+	for _, r := range args.Limits {
+		lt, ok := limits.FromLinuxResourceName[r.Name]
 		if !ok {
-			return fmt.Errorf("unknown limit %q", name)
+			return fmt.Errorf("unknown limit %q", r.Name)
 		}
-		ls.SetUnchecked(lt, limit)
+		ls.SetUnchecked(lt, r.Limit)
 	}
 
 	initArgs := kernel.CreateProcessArgs{
@@ -328,15 +341,15 @@ func (l *Lifecycle) StartContainer(args *StartContainerArgs, _ *uint32) error {
 	initialCgroups := make(map[kernel.Cgroup]struct{}, len(args.InitialCgroups))
 	cgroupRegistry := l.Kernel.CgroupRegistry()
 	// path is relative to the container's cgroup controller of specified type.
-	for initialCgroupController, path := range args.InitialCgroups {
-		if !cgroupRegistry.IsControllerBound(initialCgroupController) && l.Kernel.Cgroup2FS().EverMounted() {
+	for _, c := range args.InitialCgroups {
+		if !cgroupRegistry.IsControllerBound(c.Name) && l.Kernel.Cgroup2FS().EverMounted() {
 			// We are in V2 mode and this controller is not bound to V1.
 			// This is expected as V1 mounts are suppressed.
 			continue
 		}
-		cg, err := cgroupRegistry.FindCgroup(ctx, initialCgroupController, path)
+		cg, err := cgroupRegistry.FindCgroup(ctx, c.Name, c.Path)
 		if err != nil {
-			return fmt.Errorf("FindCgroup can't locate cgroup controller: %v err: %v", initialCgroupController, err)
+			return fmt.Errorf("FindCgroup can't locate cgroup controller: %v err: %v", c.Name, err)
 		}
 		initialCgroups[cg] = struct{}{}
 	}

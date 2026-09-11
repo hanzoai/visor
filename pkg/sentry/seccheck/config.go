@@ -15,6 +15,7 @@
 package seccheck
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"sync"
@@ -56,7 +57,7 @@ type SessionConfig struct {
 	// Sinks are the sinks that will process the points enabled above.
 	Sinks []SinkConfig `json:"sinks,omitempty"`
 	// Options holds session-level configuration options.
-	Options map[string]any `json:"options,omitempty"`
+	Options Options `json:"options,omitempty"`
 }
 
 // PointConfig describes a point to be enabled in a given session.
@@ -69,13 +70,21 @@ type PointConfig struct {
 	ContextFields []string `json:"context_fields,omitempty"`
 }
 
+// Options are the session-level settings a trace configuration may set.
+type Options struct {
+	// ExecveHashCacheCapacity bounds the execve hash cache. Zero takes
+	// DefaultExecveHashCacheCapacity.
+	ExecveHashCacheCapacity int `json:"execve_hash_cache_capacity,omitempty"`
+}
+
 // SinkConfig describes the sink that will process the points in a given
 // session.
 type SinkConfig struct {
 	// Name is the sink to be created. The sink must exist in the system.
 	Name string `json:"name,omitempty"`
-	// Config is a opaque json object that is passed to the sink.
-	Config map[string]any `json:"config,omitempty"`
+	// Config is a opaque json object that is passed to the sink. It stays the
+	// bytes it arrived as: what they mean is the sink's to say.
+	Config json.RawMessage `json:"config,omitempty"`
 	// IgnoreSetupError makes errors during sink setup to be ignored. Otherwise,
 	// failures will prevent the container from starting.
 	IgnoreSetupError bool `json:"ignore_setup_error,omitempty"`
@@ -106,12 +115,8 @@ func Create(conf *SessionConfig, force bool) error {
 	state := &Global
 
 	capacity := DefaultExecveHashCacheCapacity
-	if val, ok := conf.Options["execve_hash_cache_capacity"]; ok {
-		if cnt, ok := val.(float64); ok {
-			capacity = int(cnt)
-		} else if cnt, ok := val.(int); ok {
-			capacity = cnt
-		}
+	if conf.Options.ExecveHashCacheCapacity > 0 {
+		capacity = conf.Options.ExecveHashCacheCapacity
 	}
 	var reqs []PointReq
 	for _, ptConfig := range conf.Points {
@@ -145,7 +150,11 @@ func Create(conf *SessionConfig, force bool) error {
 		if err != nil {
 			return err
 		}
-		sink, err := desc.New(sinkConfig.Config, sinkConfig.FD)
+		opts, err := sinkConfig.options()
+		if err != nil {
+			return err
+		}
+		sink, err := desc.New(opts, sinkConfig.FD)
 		if err != nil {
 			return fmt.Errorf("creating event sink: %w", err)
 		}
@@ -187,7 +196,24 @@ func setupSink(config SinkConfig) (*os.File, error) {
 	if sink.Setup == nil {
 		return nil, nil
 	}
-	return sink.Setup(config.Config)
+	opts, err := config.options()
+	if err != nil {
+		return nil, err
+	}
+	return sink.Setup(opts)
+}
+
+// options reads the sink's opaque object. What the keys mean is the sink's to
+// say, so this is the one place the bytes become values.
+func (c SinkConfig) options() (map[string]any, error) {
+	if len(c.Config) == 0 {
+		return nil, nil
+	}
+	var opts map[string]any
+	if err := json.Unmarshal(c.Config, &opts); err != nil {
+		return nil, fmt.Errorf("sink %q config: %w", c.Name, err)
+	}
+	return opts, nil
 }
 
 // Delete deletes an existing session.

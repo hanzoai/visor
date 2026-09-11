@@ -210,6 +210,11 @@ governance-check: governance-regen ## Checks that the files derived from governa
 		(echo "Generated governance files are out of sync. Please run \`make governance-regen\`." >&2; exit 1)
 .PHONY: governance-check
 
+zap: ## Regenerates the ZAP wire of every urpc payload.
+	@for f in $$(git ls-files '*/zap.go' | grep -v '^tools/zap/'); do sed -i '/^package /q' $$f; done
+	@$(call run,//tools/zap:zap)
+.PHONY: zap
+
 license-check: ## Checks that tools/licensecheck/dependencies.yaml has an entry for every dependency.
 	@$(call run,//tools/licensecheck/main:licensecheck,--mode=verify)
 .PHONY: license-check

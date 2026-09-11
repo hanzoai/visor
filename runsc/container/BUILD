@@ -13,10 +13,12 @@ go_library(
         "null_netns.go",
         "state_file.go",
         "status.go",
+        "zap.go",
     ],
     visibility = [
         "//runsc:__subpackages__",
         "//test:__subpackages__",
+        "//tools/zap:__pkg__",
     ],
     deps = [
         "//pkg/abi/linux",
@@ -42,6 +44,7 @@ go_library(
         "//runsc/starttime",
         "@com_github_gofrs_flock//:go_default_library",
         "@com_github_opencontainers_runtime_spec//specs-go:go_default_library",
+        "@com_github_zap_proto_go//:go",
         "@org_golang_x_sys//unix:go_default_library",
     ],
 )

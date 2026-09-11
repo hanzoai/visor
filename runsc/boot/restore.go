@@ -191,7 +191,7 @@ func saveOptsFromSpec(spec *specs.Spec, fds []*fd.FD, useCheckpointGofer bool) (
 		FilePayload: urpc.FilePayload{
 			Files: files,
 		},
-		Metadata:                 comp.ToMetadata(),
+		Metadata:                 control.Pairs(comp.ToMetadata()),
 		HavePagesFile:            len(files) > 1,
 		Resume:                   specutils.AnnotationToBool(spec, annotationCheckpointResume),
 		CudaCheckpointSequential: specutils.AnnotationToBool(spec, annotationCheckpointCudaCheckpointSequential),

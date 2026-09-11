@@ -14,6 +14,7 @@ go_library(
         "config_bundles.go",
         "flags.go",
         "flags_graveyard.go",
+        "zap.go",
     ],
     visibility = ["//:sandbox"],
     deps = [
@@ -23,6 +24,7 @@ go_library(
         "//pkg/sync",
         "//runsc/flag",
         "//runsc/version",
+        "@com_github_zap_proto_go//:go",
     ],
 )
 

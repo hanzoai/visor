@@ -53,13 +53,13 @@ var DefaultLoopbackLink = LoopbackLink{
 	},
 	Routes: []Route{
 		{
-			Destination: net.IPNet{
+			Destination: Subnet{
 				IP:   net.IPv4(0x7f, 0, 0, 0),
 				Mask: net.IPv4Mask(0xff, 0, 0, 0),
 			},
 		},
 		{
-			Destination: net.IPNet{
+			Destination: Subnet{
 				IP:   net.IPv6loopback,
 				Mask: net.IPMask(strings.Repeat("\xff", net.IPv6len)),
 			},
@@ -77,9 +77,17 @@ type Network struct {
 	PluginStack plugin.PluginStack
 }
 
+// Subnet is an address and the mask that selects its network. It restates
+// net.IPNet, which the RPC cannot carry: a stdlib type cannot state its own
+// wire, and a conversion between the two is legal in either direction.
+type Subnet struct {
+	IP   net.IP
+	Mask net.IPMask
+}
+
 // Route represents a route in the network stack.
 type Route struct {
-	Destination net.IPNet
+	Destination Subnet
 	Gateway     net.IP
 	MTU         uint32
 }

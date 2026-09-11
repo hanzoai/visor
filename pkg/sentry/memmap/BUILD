@@ -50,6 +50,7 @@ go_library(
         "mapping_set.go",
         "mapping_set_impl.go",
         "memmap.go",
+        "zap.go",
     ],
     visibility = ["//pkg/sentry:internal"],
     deps = [
@@ -59,6 +60,7 @@ go_library(
         "//pkg/log",
         "//pkg/safemem",
         "//pkg/usermem",
+        "@com_github_zap_proto_go//:go",
     ],
 )
 

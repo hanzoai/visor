@@ -72,7 +72,7 @@ type SaveOpts struct {
 	Key []byte `json:"key"`
 
 	// Metadata is the set of metadata to prepend to the state file.
-	Metadata map[string]string `json:"metadata"`
+	Metadata []Pair `json:"metadata"`
 
 	// AppMFExcludeCommittedZeroPages is the value of
 	// pgalloc.SaveOpts.ExcludeCommittedZeroPages for the application memory
@@ -123,13 +123,33 @@ type SaveRestoreExecOpts struct {
 	ContainerID string
 }
 
+// Pair is one key and its value. A map is a set of them with no order and no
+// offsets, so it crosses as a list and becomes a map again at the far end.
+type Pair struct {
+	Key   string
+	Value string
+}
+
+// Pairs restates a map as the list that crosses.
+func Pairs(m map[string]string) []Pair {
+	ps := make([]Pair, 0, len(m))
+	for k, v := range m {
+		ps = append(ps, Pair{Key: k, Value: v})
+	}
+	return ps
+}
+
 // ConvertToStateSaveOpts converts a control.SaveOpts to a state.SaveOpts.
 // state.SaveOpts.Close() must be called when the state.SaveOpts is no longer
 // needed.
 func ConvertToStateSaveOpts(o *SaveOpts) (*state.SaveOpts, error) {
+	metadata := make(map[string]string, len(o.Metadata))
+	for _, p := range o.Metadata {
+		metadata[p.Key] = p.Value
+	}
 	saveOpts := &state.SaveOpts{
 		Key:                            o.Key,
-		Metadata:                       o.Metadata,
+		Metadata:                       metadata,
 		AppMFExcludeCommittedZeroPages: o.AppMFExcludeCommittedZeroPages,
 		Resume:                         o.Resume,
 		CudaCheckpointPath:             o.CudaCheckpointPath,
