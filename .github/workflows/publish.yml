@@ -30,8 +30,14 @@ jobs:
         include:
           - arch: x86_64
             runs-on: hanzo-linux-amd64
-          - arch: aarch64
-            runs-on: hanzo-linux-arm64
+          # aarch64 is NOT here yet, and that is a measurement: the runner image
+          # oci.hanzo.ai/hanzoai/git-runner:5 is a single manifest, so an arm64
+          # node cannot start it — its pods StartError and the job then sits
+          # queued forever, which looks like nothing happening. Add this arch
+          # back in the same commit that publishes a multi-arch runner image.
+          #
+          #   - arch: aarch64
+          #     runs-on: hanzo-linux-arm64
     runs-on: ${{ matrix.runs-on }}
     env:
       TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
@@ -43,8 +49,32 @@ jobs:
       # ONE bazel invocation for both, so the shim and the runtime it execs are
       # always the same build. A shim paired with a runtime it was not built
       # against fails at container start, after admission.
+      # bazel DIRECTLY, not `make copy`: the Makefile wraps bazel in a container
+      # and pushes to an upstream registry, so it needs a docker socket our
+      # runners do not have — it failed with `dial unix /var/run/docker.sock`
+      # before building anything.
+      #
+      # bazelisk rather than a pinned bazel, because the repo states its own
+      # version in .bazelversion and bazelisk is the one thing that reads it.
+      - name: Install bazelisk
+        run: |
+          set -eu
+          # The RELEASE is pinned; the digest is not asserted here because a
+          # checksum nobody has verified out-of-band is theatre. What the build
+          # actually proves is the binary it produces: the version gate below
+          # rejects anything that does not report -visor.
+          curl -fsSL -o /tmp/bazelisk \
+            https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64
+          sudo install -m 0755 /tmp/bazelisk /usr/local/bin/bazel
+          bazel version
+
       - name: Build
-        run: make copy TARGETS="//runsc:runsc //shim:containerd-shim-runsc-v1" DESTINATION=bin/
+        run: |
+          set -eu
+          bazel build //runsc:runsc //shim:containerd-shim-runsc-v1
+          mkdir -p bin
+          cp -L "$(find -L bazel-bin/runsc -type f -name runsc | head -1)" bin/runsc
+          cp -L "$(find -L bazel-bin -type f -name containerd-shim-runsc-v1 | head -1)" bin/containerd-shim-runsc-v1
 
       # The runtime installs as `visor` — the name the containerd handler and the
       # RuntimeClass both use. Asking it for its version is the cheapest proof the
