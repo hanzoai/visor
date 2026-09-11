@@ -1715,15 +1715,16 @@ func (l *Loader) executeAsync(args *control.ExecArgs) (kernel.ThreadID, error) {
 	// Get the container MountNamespace from the Task. Try to acquire ref may fail
 	// in case it raced with task exit.
 	// task.MountNamespace() does not take a ref, so we must do so ourselves.
-	args.MountNamespace = tg.Leader().MountNamespace()
-	if args.MountNamespace == nil || !args.MountNamespace.TryIncRef() {
+	var env control.Env
+	env.MountNamespace = tg.Leader().MountNamespace()
+	if env.MountNamespace == nil || !env.MountNamespace.TryIncRef() {
 		return 0, fmt.Errorf("container %q has stopped", args.ContainerID)
 	}
 	sctx := l.k.SupervisorContext()
-	root := args.MountNamespace.Root(sctx)
+	root := env.MountNamespace.Root(sctx)
 	defer root.DecRef(sctx)
 	ctx := vfs.WithRoot(sctx, root)
-	defer args.MountNamespace.DecRef(ctx)
+	defer env.MountNamespace.DecRef(ctx)
 
 	args.Envv, err = specutils.ResolveEnvs(args.Envv)
 	if err != nil {
@@ -1731,24 +1732,24 @@ func (l *Loader) executeAsync(args *control.ExecArgs) (kernel.ThreadID, error) {
 	}
 
 	// Add the HOME environment variable if it is not already set.
-	args.Envv, err = user.MaybeAddExecUserHome(ctx, args.MountNamespace, args.KUID, args.Envv)
+	args.Envv, err = user.MaybeAddExecUserHome(ctx, env.MountNamespace, args.KUID, args.Envv)
 	if err != nil {
 		return 0, err
 	}
-	args.PIDNamespace = tg.PIDNamespace()
+	env.PIDNamespace = tg.PIDNamespace()
 
 	if l.root.conf.InSandboxCgroup == config.InSandboxCgroupV2 {
 		// Join the container's cgroup and cgroup namespace, like Linux's
 		// runc exec does.
 		leader := tg.Leader()
-		args.InitialCgroupV2 = leader.Cgroup2()
+		env.InitialCgroupV2 = leader.Cgroup2()
 		if cgroupns := leader.GetCgroupNamespace(); cgroupns != nil {
-			args.CgroupNamespace = cgroupns
+			env.CgroupNamespace = cgroupns
 			defer cgroupns.DecRef(sctx)
 		}
 	}
 
-	args.Limits, err = createLimitSet(l.root.spec, specutils.TPUProxyEnabled(l.root.spec, l.root.conf))
+	env.Limits, err = createLimitSet(l.root.spec, specutils.TPUProxyEnabled(l.root.spec, l.root.conf))
 	if err != nil {
 		return 0, fmt.Errorf("creating limits: %w", err)
 	}
@@ -1760,12 +1761,12 @@ func (l *Loader) executeAsync(args *control.ExecArgs) (kernel.ThreadID, error) {
 		if err != nil {
 			return 0, err
 		}
-		args.SeccompProgram = seccompProgram
+		env.SeccompProgram = seccompProgram
 	}
 
 	// Start the process.
 	proc := control.Proc{Kernel: l.k}
-	newTG, tgid, ttyFile, err := control.ExecAsync(&proc, args)
+	newTG, tgid, ttyFile, err := control.ExecAsync(&proc, args, env)
 	if err != nil {
 		return 0, err
 	}

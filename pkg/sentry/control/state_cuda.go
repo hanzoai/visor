@@ -199,7 +199,9 @@ func invokeCudaCheckpoint(sctx context.Context, k *kernel.Kernel, proc *Proc, cu
 			"--pid",
 			strconv.FormatInt(int64(pid), 10),
 		},
-		ContainerID:    contID,
+		ContainerID: contID,
+	}
+	env := Env{
 		MountNamespace: mntns,
 		PIDNamespace:   leader.PIDNamespace(),
 	}
@@ -210,12 +212,12 @@ func invokeCudaCheckpoint(sctx context.Context, k *kernel.Kernel, proc *Proc, cu
 	// Provide standard streams to cuda-checkpoint. Use /dev/null as stdin
 	// and direct cuda-checkpoint's stdout/stderr to a pipe.
 	ckptDesc := fmt.Sprintf("cuda-checkpoint %s for PID %d in container %q", opFlag, pid, contID)
-	args.FDTable = k.NewFDTable()
+	env.FDTable = k.NewFDTable()
 	cu.Add(func() {
-		args.FDTable.DecRef(ctx)
+		env.FDTable.DecRef(ctx)
 	})
 	if nullFD != nil {
-		if _, err := args.FDTable.NewFDAt(ctx, 0, nullFD, kernel.FDFlags{}); err != nil {
+		if _, err := env.FDTable.NewFDAt(ctx, 0, nullFD, kernel.FDFlags{}); err != nil {
 			log.Warningf("Failed to make /dev/null stdin for %s: %v", ckptDesc, err)
 		}
 	}
@@ -224,10 +226,10 @@ func invokeCudaCheckpoint(sctx context.Context, k *kernel.Kernel, proc *Proc, cu
 	if err != nil {
 		log.Warningf("Failed to create stdout/stderr pipe for %s: %v", ckptDesc, err)
 	} else {
-		if _, err := args.FDTable.NewFDAt(ctx, 1, wfd, kernel.FDFlags{}); err != nil {
+		if _, err := env.FDTable.NewFDAt(ctx, 1, wfd, kernel.FDFlags{}); err != nil {
 			log.Warningf("Failed to make pipe stdout for %s: %v", ckptDesc, err)
 		}
-		if _, err := args.FDTable.NewFDAt(ctx, 2, wfd, kernel.FDFlags{}); err != nil {
+		if _, err := env.FDTable.NewFDAt(ctx, 2, wfd, kernel.FDFlags{}); err != nil {
 			log.Warningf("Failed to make pipe stderr for %s: %v", ckptDesc, err)
 		}
 		wfd.DecRef(ctx)
@@ -235,7 +237,7 @@ func invokeCudaCheckpoint(sctx context.Context, k *kernel.Kernel, proc *Proc, cu
 		cu.Add(ckptOut.Stop)
 	}
 	// FIXME(ayushranjan): Get WorkDirectory, Limits and Capabilities from spec?
-	ckptTG, _, _, err := ExecAsync(proc, args)
+	ckptTG, _, _, err := ExecAsync(proc, args, env)
 	if err != nil {
 		return checkpointProc{}, nil, fmt.Errorf("failed to exec %s: %w", ckptDesc, err)
 	}

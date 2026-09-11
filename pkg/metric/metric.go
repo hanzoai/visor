@@ -1620,7 +1620,7 @@ func GetSnapshot(options SnapshotOptions) (*prometheus.Snapshot, error) {
 			}
 			snapshot.Add(&prometheus.Data{
 				Metric: m.prometheusMetric,
-				Labels: labels,
+				Labels: prometheus.Labels(labels),
 				HistogramValue: &prometheus.Histogram{
 					Total:                  prometheus.Number{Int: statistics[fieldKey].sampleSum},
 					SumOfSquaredDeviations: prometheus.Number{Float: statistics[fieldKey].sumOfSquaredDeviations},

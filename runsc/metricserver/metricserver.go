@@ -741,7 +741,7 @@ func (m *metricServer) serveMetrics(w *httpResponseWriter, req *http.Request) ht
 			snapshot: r.snapshot,
 			options: prometheus.SnapshotExportOptions{
 				ExporterPrefix: m.exporterPrefix,
-				ExtraLabels:    r.served.extraLabels,
+				ExtraLabels:    prometheus.Labels(r.served.extraLabels),
 			},
 		}
 	})

@@ -10,10 +10,14 @@ go_library(
     srcs = [
         "prometheus.go",
         "prometheus_verify.go",
+        "zap.go",
     ],
     stateify = False,
     visibility = ["//:sandbox"],
-    deps = ["//pkg/metric:metric_go_proto"],
+    deps = [
+        "//pkg/metric:metric_go_proto",
+        "@com_github_zap_proto_go//:go",
+    ],
 )
 
 go_test(

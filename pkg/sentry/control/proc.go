@@ -105,12 +105,6 @@ type ExecArgs struct {
 	// Envv is a list of environment variables.
 	Envv []string `json:"envv"`
 
-	// MountNamespace is the mount namespace to execute the new process in.
-	// A reference on MountNamespace must be held for the lifetime of the
-	// ExecArgs. If MountNamespace is nil, it will default to the init
-	// process's MountNamespace.
-	MountNamespace *vfs.MountNamespace
-
 	// WorkingDirectory defines the working directory for the new process.
 	WorkingDirectory string `json:"wd"`
 
@@ -141,14 +135,26 @@ type ExecArgs struct {
 	// FilePayload determines the files to give to the new process.
 	FilePayload
 
-	// If FDTable is not nil, it is the process FD table. If Exec/ExecAsync
-	// succeeds, it takes a reference on FDTable.
-	FDTable *kernel.FDTable
-
 	// ContainerID is the container for the process being executed.
 	ContainerID string
+}
 
-	// PIDNamespace is the pid namespace for the process being executed.
+// Env is what the sentry supplies for an exec: the live kernel objects the new
+// process runs against. None of them can cross the control plane -- a
+// namespace is a reference, not a value -- so a call that arrived on the wire
+// passes the zero Env and every field takes its default.
+type Env struct {
+	// MountNamespace is the mount namespace to execute the new process in.
+	// A reference must be held for the lifetime of the call. Nil takes the
+	// init process's MountNamespace.
+	MountNamespace *vfs.MountNamespace
+
+	// FDTable is the process FD table. On success a reference is taken on it.
+	// Nil takes a fresh table.
+	FDTable *kernel.FDTable
+
+	// PIDNamespace is the pid namespace for the process being executed. Nil
+	// takes the root one.
 	PIDNamespace *kernel.PIDNamespace
 
 	// InitialCgroupV2 is the cgroup2 node the process being executed starts
@@ -156,11 +162,12 @@ type ExecArgs struct {
 	InitialCgroupV2 kernel.Cgroup2
 
 	// CgroupNamespace is the cgroup namespace for the process being executed.
-	// If nil, the root cgroup namespace is used. A reference on
-	// CgroupNamespace must be held for the lifetime of the ExecArgs.
+	// If nil, the root cgroup namespace is used. A reference must be held for
+	// the lifetime of the call.
 	CgroupNamespace *kernel.CgroupNamespace
 
-	// Limits is the limit set for the process being executed.
+	// Limits is the limit set for the process being executed. Nil takes an
+	// empty set.
 	Limits *limits.LimitSet
 
 	// SeccompProgram is an optional seccomp BPF program to install on the
@@ -183,7 +190,7 @@ func (args *ExecArgs) String() string {
 
 // Exec runs a new task.
 func (proc *Proc) Exec(args *ExecArgs, waitStatus *uint32) error {
-	newTG, _, _, err := proc.execAsync(args)
+	newTG, _, _, err := proc.execAsync(args, Env{})
 	if err != nil {
 		return err
 	}
@@ -196,14 +203,14 @@ func (proc *Proc) Exec(args *ExecArgs, waitStatus *uint32) error {
 
 // ExecAsync runs a new task, but doesn't wait for it to finish. It is defined
 // as a function rather than a method to avoid exposing execAsync as an RPC.
-func ExecAsync(proc *Proc, args *ExecArgs) (*kernel.ThreadGroup, kernel.ThreadID, *host.TTYFileDescription, error) {
-	return proc.execAsync(args)
+func ExecAsync(proc *Proc, args *ExecArgs, env Env) (*kernel.ThreadGroup, kernel.ThreadID, *host.TTYFileDescription, error) {
+	return proc.execAsync(args, env)
 }
 
 // execAsync runs a new task, but doesn't wait for it to finish. It returns the
 // newly created thread group and its PID. If the stdio FDs are TTYs, then a
 // TTYFileOperations that wraps the TTY is also returned.
-func (proc *Proc) execAsync(args *ExecArgs) (*kernel.ThreadGroup, kernel.ThreadID, *host.TTYFileDescription, error) {
+func (proc *Proc) execAsync(args *ExecArgs, env Env) (*kernel.ThreadGroup, kernel.ThreadID, *host.TTYFileDescription, error) {
 	creds := auth.NewUserCredentials(
 		args.KUID,
 		args.KGID,
@@ -211,11 +218,11 @@ func (proc *Proc) execAsync(args *ExecArgs) (*kernel.ThreadGroup, kernel.ThreadI
 		args.Capabilities,
 		proc.Kernel.RootUserNamespace())
 
-	pidns := args.PIDNamespace
+	pidns := env.PIDNamespace
 	if pidns == nil {
 		pidns = proc.Kernel.RootPIDNamespace()
 	}
-	limitSet := args.Limits
+	limitSet := env.Limits
 	if limitSet == nil {
 		limitSet = limits.NewLimitSet()
 	}
@@ -224,7 +231,7 @@ func (proc *Proc) execAsync(args *ExecArgs) (*kernel.ThreadGroup, kernel.ThreadI
 		Argv:                 args.Argv,
 		Envv:                 args.Envv,
 		WorkingDirectory:     args.WorkingDirectory,
-		MountNamespace:       args.MountNamespace,
+		MountNamespace:       env.MountNamespace,
 		Credentials:          creds,
 		NoNewPrivs:           args.NoNewPrivileges,
 		Umask:                0022,
@@ -234,8 +241,8 @@ func (proc *Proc) execAsync(args *ExecArgs) (*kernel.ThreadGroup, kernel.ThreadI
 		IPCNamespace:         proc.Kernel.RootIPCNamespace(),
 		ContainerID:          args.ContainerID,
 		PIDNamespace:         pidns,
-		InitialCgroupV2:      args.InitialCgroupV2,
-		CgroupNamespace:      args.CgroupNamespace,
+		InitialCgroupV2:      env.InitialCgroupV2,
+		CgroupNamespace:      env.CgroupNamespace,
 		Origin:               kernel.OriginExec,
 	}
 	ctx := initArgs.NewContext(proc.Kernel)
@@ -252,8 +259,8 @@ func (proc *Proc) execAsync(args *ExecArgs) (*kernel.ThreadGroup, kernel.ThreadI
 
 	// Import file descriptors.
 	var fdTable *kernel.FDTable
-	if args.FDTable != nil {
-		fdTable = args.FDTable
+	if env.FDTable != nil {
+		fdTable = env.FDTable
 		// reference borrowed from the caller
 	} else {
 		fdTable = proc.Kernel.NewFDTable()
@@ -335,9 +342,9 @@ func (proc *Proc) execAsync(args *ExecArgs) (*kernel.ThreadGroup, kernel.ThreadI
 		return nil, 0, nil, err
 	}
 
-	if args.SeccompProgram != nil {
+	if env.SeccompProgram != nil {
 		task := tg.Leader()
-		if err := task.AppendSyscallFilter(*args.SeccompProgram, true); err != nil {
+		if err := task.AppendSyscallFilter(*env.SeccompProgram, true); err != nil {
 			return nil, 0, nil, fmt.Errorf("appending seccomp filters: %w", err)
 		}
 	}

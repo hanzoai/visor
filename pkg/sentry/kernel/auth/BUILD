@@ -86,6 +86,7 @@ go_library(
         "keyset_transaction_mutex.go",
         "user_namespace.go",
         "user_namespace_mutex.go",
+        "zap.go",
     ],
     marshal = True,
     visibility = [
@@ -104,6 +105,7 @@ go_library(
         "//pkg/sentry/seccheck/points:points_go_proto",
         "//pkg/sync",
         "//pkg/sync/locking",
+        "@com_github_zap_proto_go//:go",
     ],
 )
 

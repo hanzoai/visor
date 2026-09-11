@@ -363,9 +363,9 @@ type Data struct {
 	// Metric is the metric for which the value is being reported.
 	Metric *Metric `json:"metric"`
 
-	// Labels is a key-value pair representing the labels set on this metric.
-	// This may be merged with other labels during export.
-	Labels map[string]string `json:"labels,omitempty"`
+	// Labels are the labels set on this metric.
+	// These may be merged with other labels during export.
+	Labels []Label `json:"labels,omitempty"`
 
 	// ExternalLabels are more labels merged together with `Labels`.
 	// They can be set using SetExternalLabels.
@@ -374,7 +374,7 @@ type Data struct {
 	// that are shared between multiple data points (stored in `ExternalLabels`).
 	// This avoids allocating unique `Labels` maps for each Data struct, when
 	// most of the actual labels would be shared between them.
-	ExternalLabels map[string]string `json:"external_labels,omitempty"`
+	ExternalLabels []Label `json:"external_labels,omitempty"`
 
 	// At most one of the fields below may be set.
 	// Which one depends on the type of the metric.
@@ -393,7 +393,7 @@ func NewIntData(metric *Metric, val int64) *Data {
 
 // LabeledIntData returns a new Data struct with the given metric, labels, and value.
 func LabeledIntData(metric *Metric, labels map[string]string, val int64) *Data {
-	return &Data{Metric: metric, Labels: labels, Number: NewInt(val)}
+	return &Data{Metric: metric, Labels: Labels(labels), Number: NewInt(val)}
 }
 
 // NewFloatData returns a new Data struct with the given metric and value.
@@ -403,13 +403,13 @@ func NewFloatData(metric *Metric, val float64) *Data {
 
 // LabeledFloatData returns a new Data struct with the given metric, labels, and value.
 func LabeledFloatData(metric *Metric, labels map[string]string, val float64) *Data {
-	return &Data{Metric: metric, Labels: labels, Number: NewFloat(val)}
+	return &Data{Metric: metric, Labels: Labels(labels), Number: NewFloat(val)}
 }
 
 // SetExternalLabels sets d.ExternalLabels. See its docstring for more information.
 // Returns `d` for chainability.
 func (d *Data) SetExternalLabels(externalLabels map[string]string) *Data {
-	d.ExternalLabels = externalLabels
+	d.ExternalLabels = Labels(externalLabels)
 	return d
 }
 
@@ -432,7 +432,7 @@ type SnapshotExportOptions struct {
 	ExporterPrefix string
 
 	// ExtraLabels is added as labels for all metric values.
-	ExtraLabels map[string]string
+	ExtraLabels []Label
 }
 
 // writeEscapedString writes the given string in quotation marks and with some characters escaped,
@@ -517,28 +517,46 @@ func writeMetricPreambleTo[T io.StringWriter](w T, d *Data, options SnapshotExpo
 	return nil
 }
 
-// keyVal is a key-value pair used in the function below.
-type keyVal struct{ Key, Value string }
+// Label is one label and its value. A set of them is a list rather than a map
+// because a Data crosses the control plane, where a field is an offset and a
+// map has none.
+type Label struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+// Labels restates a map of labels as the list a Data carries.
+func Labels(m map[string]string) []Label {
+	if len(m) == 0 {
+		return nil
+	}
+	ls := make([]Label, 0, len(m))
+	for k, v := range m {
+		ls = append(ls, Label{Key: k, Value: v})
+	}
+	return ls
+}
 
 // sortedIterateLabels iterates through labels and outputs them to `out` in sorted key order,
 // or stops when cancelCh is written to. It runs in O(n^2) time but makes no heap allocations.
-func sortedIterateLabels(labels map[string]string, out chan<- keyVal, cancelCh <-chan struct{}) {
+func sortedIterateLabels(labels []Label, out chan<- Label, cancelCh <-chan struct{}) {
 	defer close(out)
 	if len(labels) == 0 {
 		return
 	}
 
-	// smallestKey is the smallest key that we've already sent to `out`.
-	// It starts as the empty string, which means we haven't sent anything to `out` yet.
-	smallestKey := ""
+	// smallest is the smallest label that we've already sent to `out`.
+	// Its key starts as the empty string, which means we haven't sent anything
+	// to `out` yet.
+	var smallest Label
 	// Find the smallest key of the whole set and send it out.
-	for k := range labels {
-		if smallestKey == "" || k < smallestKey {
-			smallestKey = k
+	for _, l := range labels {
+		if smallest.Key == "" || l.Key < smallest.Key {
+			smallest = l
 		}
 	}
 	select {
-	case out <- keyVal{smallestKey, labels[smallestKey]}:
+	case out <- smallest:
 	case <-cancelCh:
 		return
 	}
@@ -546,18 +564,19 @@ func sortedIterateLabels(labels map[string]string, out chan<- keyVal, cancelCh <
 	// Iterate until we've sent as many items as we have as input to the output channel.
 	// We start at 1 because the loop above already sent out the smallest key to `out`.
 	for numOutput := 1; numOutput < len(labels); numOutput++ {
-		// nextSmallestKey is the smallest key that is strictly larger than `smallestKey`.
-		nextSmallestKey := ""
-		for k := range labels {
-			if k > smallestKey && (nextSmallestKey == "" || k < nextSmallestKey) {
-				nextSmallestKey = k
+		// next is the smallest label whose key is strictly larger than
+		// smallest's.
+		var next Label
+		for _, l := range labels {
+			if l.Key > smallest.Key && (next.Key == "" || l.Key < next.Key) {
+				next = l
 			}
 		}
 
-		// Update smallestKey and send it out.
-		smallestKey = nextSmallestKey
+		// Update smallest and send it out.
+		smallest = next
 		select {
-		case out <- keyVal{smallestKey, labels[smallestKey]}:
+		case out <- smallest:
 		case <-cancelCh:
 			return
 		}
@@ -575,7 +594,7 @@ type LabelOrError struct {
 // a reserved Prometheus label name and should go last.
 // If an error is encountered, it is returned as the Error field of LabelOrError, and no further
 // messages will be sent on the channel.
-func OrderedLabels(labels ...map[string]string) <-chan LabelOrError {
+func OrderedLabels(labels ...[]Label) <-chan LabelOrError {
 	// This function is quite hot on the metric-rendering path, and its naive "just put all the
 	// strings in one map to ensure no dupes it, then in one slice and sort it" approach is very
 	// allocation-heavy. This approach is more computation-heavy (it runs in
@@ -584,8 +603,8 @@ func OrderedLabels(labels ...map[string]string) <-chan LabelOrError {
 	// each label map is tiny, so this is worth doing despite the theoretically-longer run time.
 
 	// Initialize the channels we'll use.
-	mapChannels := make([]chan keyVal, 0, len(labels))
-	lastKeyVal := make([]keyVal, len(labels))
+	mapChannels := make([]chan Label, 0, len(labels))
+	lastKeyVal := make([]Label, len(labels))
 	resultCh := make(chan LabelOrError)
 	var cancelCh chan struct{}
 	// outputError is a helper function for when we have encountered an error mid-way.
@@ -603,9 +622,9 @@ func OrderedLabels(labels ...map[string]string) <-chan LabelOrError {
 	// Verify that no label is the empty string. It's not a valid label name,
 	// and we use the empty string later on in the function as a marker of having
 	// finished processing all labels from a given label map.
-	for _, labelMap := range labels {
-		for label := range labelMap {
-			if label == "" {
+	for _, labelList := range labels {
+		for _, label := range labelList {
+			if label.Key == "" {
 				go outputError(errors.New("got empty-string label"))
 				return resultCh
 			}
@@ -615,10 +634,10 @@ func OrderedLabels(labels ...map[string]string) <-chan LabelOrError {
 	// Each label map is processed in its own goroutine,
 	// which will stream it back to this function in sorted order.
 	cancelCh = make(chan struct{}, len(labels))
-	for _, labelMap := range labels {
-		ch := make(chan keyVal)
+	for _, labelList := range labels {
+		ch := make(chan Label)
 		mapChannels = append(mapChannels, ch)
-		go sortedIterateLabels(labelMap, ch, cancelCh)
+		go sortedIterateLabels(labelList, ch, cancelCh)
 	}
 
 	// This goroutine is the meat of this function; it iterates through
@@ -694,7 +713,7 @@ func OrderedLabels(labels ...map[string]string) <-chan LabelOrError {
 			// Mark the last key-value pair from the channel that gave us the
 			// smallest key-value pair as no longer present, so that we get a new
 			// key-value pair from it in the next iteration.
-			lastKeyVal[indexForSmallest] = keyVal{}
+			lastKeyVal[indexForSmallest] = Label{}
 		}
 
 		// Output the "le" label last.
@@ -712,14 +731,14 @@ func OrderedLabels(labels ...map[string]string) <-chan LabelOrError {
 }
 
 // writeLabelsTo writes a set of metric labels.
-func writeLabelsTo[T io.StringWriter](w T, d *Data, extraLabels map[string]string, leLabel *Number) error {
+func writeLabelsTo[T io.StringWriter](w T, d *Data, extraLabels []Label, leLabel *Number) error {
 	if len(d.Labels)+len(d.ExternalLabels)+len(extraLabels) != 0 || leLabel != nil {
 		if _, err := w.WriteString("{"); err != nil {
 			return err
 		}
 		var orderedLabels <-chan LabelOrError
 		if leLabel != nil {
-			orderedLabels = OrderedLabels(d.Labels, d.ExternalLabels, extraLabels, map[string]string{"le": leLabel.String()})
+			orderedLabels = OrderedLabels(d.Labels, d.ExternalLabels, extraLabels, []Label{{Key: "le", Value: leLabel.String()}})
 		} else {
 			orderedLabels = OrderedLabels(d.Labels, d.ExternalLabels, extraLabels)
 		}

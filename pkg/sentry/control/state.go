@@ -410,16 +410,18 @@ func SaveRestoreExec(k *kernel.Kernel, mode SaveRestoreExecMode) error {
 		Kernel: k,
 	}
 	execArgs := ExecArgs{
-		Filename:       argv[0],
-		Argv:           argv,
-		Envv:           append(envv, fmt.Sprintf("%s=%s", saveRestoreExecEnvVar, mode)),
-		ContainerID:    contID,
+		Filename:    argv[0],
+		Argv:        argv,
+		Envv:        append(envv, fmt.Sprintf("%s=%s", saveRestoreExecEnvVar, mode)),
+		ContainerID: contID,
+	}
+	env := Env{
 		MountNamespace: mntns,
 		PIDNamespace:   leader.PIDNamespace(),
 		Limits:         limits.NewLimitSet(),
 		FDTable:        fdTable,
 	}
-	tg, _, _, err := ExecAsync(&proc, &execArgs)
+	tg, _, _, err := ExecAsync(&proc, &execArgs, env)
 	if err != nil {
 		return fmt.Errorf("failed to exec save/restore binary: %w", err)
 	}

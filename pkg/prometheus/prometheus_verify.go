@@ -512,6 +512,17 @@ func (v *verifiableMetric) numFieldCombinations() int {
 // verify does read-only checks on `data`.
 // `metricFieldsSeen` is passed across calls to `verify`. It is used to track the set of metric
 // field values that have already been seen. `verify` should populate this.
+// labelValue is the value of one label. A metric has a handful of fields, so
+// a walk costs less than the map that would have to be built to avoid it.
+func labelValue(labels []Label, key string) (string, bool) {
+	for _, l := range labels {
+		if l.Key == key {
+			return l.Value, true
+		}
+	}
+	return "", false
+}
+
 // `dataToFieldsSeen` is passed across calls to `verify` and other methods of `verifiableMetric`.
 // It is used to store the canonical representation of the field values seen for each *Data.
 //
@@ -529,7 +540,7 @@ func (v *verifiableMetric) verify(data *Data, metricFieldsSeen map[string]struct
 	firstField := true
 	for _, field := range v.metadata.GetFields() {
 		fieldName := field.GetFieldName()
-		value, found := data.Labels[fieldName]
+		value, found := labelValue(data.Labels, fieldName)
 		if !found {
 			return fmt.Errorf("did not specify field %q", fieldName)
 		}

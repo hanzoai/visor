@@ -100,7 +100,7 @@ func (m *MetricExport) Execute(ctx context.Context, f *flag.FlagSet, args ...any
 	}, map[*prometheus.Snapshot]prometheus.SnapshotExportOptions{
 		snapshot: {
 			ExporterPrefix: m.exporterPrefix,
-			ExtraLabels:    prometheusLabels,
+			ExtraLabels:    prometheus.Labels(prometheusLabels),
 		},
 	})
 	if err != nil {

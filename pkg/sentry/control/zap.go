@@ -24,6 +24,7 @@ import (
 
 	zap "github.com/zap-proto/go"
 	log "gvisor.dev/gvisor/pkg/log"
+	prometheus "gvisor.dev/gvisor/pkg/prometheus"
 	kernel "gvisor.dev/gvisor/pkg/sentry/kernel"
 	auth "gvisor.dev/gvisor/pkg/sentry/kernel/auth"
 )
@@ -692,6 +693,237 @@ func (x *EventsOpts) UnmarshalZAP(data []byte) error {
 	return nil
 }
 
+// ---- ExecArgs ----------------------------------------------------------
+
+const (
+	execArgsFilenameAt         = 0
+	execArgsArgvAt             = 8
+	execArgsEnvvAt             = 16
+	execArgsWorkingDirectoryAt = 24
+	execArgsKUIDAt             = 32
+	execArgsKGIDAt             = 36
+	execArgsExtraKGIDsAt       = 40
+	execArgsNoNewPrivilegesAt  = 48
+	execArgsCapabilitiesAt     = 56
+	execArgsStdioIsPtyAt       = 64
+	execArgsSupportTTYsAt      = 65
+	execArgsFilePayloadAt      = 72
+	execArgsContainerIDAt      = 80
+	execArgsSize               = 88
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*ExecArgs)(nil)
+
+// MarshalZAP writes ExecArgs from constant offsets.
+func (x *ExecArgs) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(execArgsSize + 256)
+	argvAt, argvN := 0, len(x.Argv)
+	if argvN > 0 {
+		var blob []byte
+		for i := range x.Argv {
+			enc := []byte(x.Argv[i])
+			var n [4]byte
+			binary.LittleEndian.PutUint32(n[:], uint32(len(enc)))
+			blob = append(blob, n[:]...)
+			blob = append(blob, enc...)
+		}
+		argvAt = b.WriteBytes(blob)
+	}
+	envvAt, envvN := 0, len(x.Envv)
+	if envvN > 0 {
+		var blob []byte
+		for i := range x.Envv {
+			enc := []byte(x.Envv[i])
+			var n [4]byte
+			binary.LittleEndian.PutUint32(n[:], uint32(len(enc)))
+			blob = append(blob, n[:]...)
+			blob = append(blob, enc...)
+		}
+		envvAt = b.WriteBytes(blob)
+	}
+	extraKGIDsAt, extraKGIDsN := 0, len(x.ExtraKGIDs)
+	if extraKGIDsN > 0 {
+		var blob []byte
+		for i := range x.ExtraKGIDs {
+			var full [8]byte
+			binary.LittleEndian.PutUint64(full[:], uint64(x.ExtraKGIDs[i]))
+			enc := full[:4]
+			var n [4]byte
+			binary.LittleEndian.PutUint32(n[:], uint32(len(enc)))
+			blob = append(blob, n[:]...)
+			blob = append(blob, enc...)
+		}
+		extraKGIDsAt = b.WriteBytes(blob)
+	}
+	ob := b.StartObject(execArgsSize)
+	ob.SetText(execArgsFilenameAt, string(x.Filename))
+	ob.SetText(execArgsWorkingDirectoryAt, string(x.WorkingDirectory))
+	ob.SetUint32(execArgsKUIDAt, uint32(x.KUID))
+	ob.SetUint32(execArgsKGIDAt, uint32(x.KGID))
+	ob.SetBool(execArgsNoNewPrivilegesAt, bool(x.NoNewPrivileges))
+	if x.Capabilities != nil {
+		innerCapabilities, err := x.Capabilities.MarshalZAP()
+		if err != nil {
+			return nil, err
+		}
+		ob.SetBytes(execArgsCapabilitiesAt, innerCapabilities)
+	}
+	ob.SetBool(execArgsStdioIsPtyAt, bool(x.StdioIsPty))
+	ob.SetBool(execArgsSupportTTYsAt, bool(x.SupportTTYs))
+	innerFilePayload, err := x.FilePayload.MarshalZAP()
+	if err != nil {
+		return nil, err
+	}
+	ob.SetBytes(execArgsFilePayloadAt, innerFilePayload)
+	ob.SetText(execArgsContainerIDAt, string(x.ContainerID))
+	if argvN > 0 {
+		ob.SetList(execArgsArgvAt, argvAt, argvN)
+	}
+	if envvN > 0 {
+		ob.SetList(execArgsEnvvAt, envvAt, envvN)
+	}
+	if extraKGIDsN > 0 {
+		ob.SetList(execArgsExtraKGIDsAt, extraKGIDsAt, extraKGIDsN)
+	}
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads ExecArgs out of the buffer that arrived.
+func (x *ExecArgs) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("ExecArgs: %w", err)
+	}
+	o := m.Root()
+	x.Filename = string(strings.Clone(o.Text(execArgsFilenameAt)))
+	if l := o.List(execArgsArgvAt); l.Len() > 0 {
+		rows := make([]string, l.Len())
+		for i := range rows {
+			rows[i] = string(l.BytesAt(i))
+		}
+		x.Argv = rows
+	}
+	if l := o.List(execArgsEnvvAt); l.Len() > 0 {
+		rows := make([]string, l.Len())
+		for i := range rows {
+			rows[i] = string(l.BytesAt(i))
+		}
+		x.Envv = rows
+	}
+	x.WorkingDirectory = string(strings.Clone(o.Text(execArgsWorkingDirectoryAt)))
+	x.KUID = auth.KUID(o.Uint32(execArgsKUIDAt))
+	x.KGID = auth.KGID(o.Uint32(execArgsKGIDAt))
+	if l := o.List(execArgsExtraKGIDsAt); l.Len() > 0 {
+		rows := make([]auth.KGID, l.Len())
+		for i := range rows {
+			var full [8]byte
+			copy(full[:], l.BytesAt(i))
+			rows[i] = auth.KGID(binary.LittleEndian.Uint64(full[:]))
+		}
+		x.ExtraKGIDs = rows
+	}
+	x.NoNewPrivileges = bool(o.Bool(execArgsNoNewPrivilegesAt))
+	if raw := o.Bytes(execArgsCapabilitiesAt); len(raw) > 0 {
+		var v auth.TaskCapabilities
+		if err := v.UnmarshalZAP(raw); err != nil {
+			return err
+		}
+		x.Capabilities = &v
+	}
+	x.StdioIsPty = bool(o.Bool(execArgsStdioIsPtyAt))
+	x.SupportTTYs = bool(o.Bool(execArgsSupportTTYsAt))
+	if raw := o.Bytes(execArgsFilePayloadAt); len(raw) > 0 {
+		if err := x.FilePayload.UnmarshalZAP(raw); err != nil {
+			return err
+		}
+	}
+	x.ContainerID = string(strings.Clone(o.Text(execArgsContainerIDAt)))
+	return nil
+}
+
+// ---- FilePayload -------------------------------------------------------
+
+const (
+	filePayloadFilePayloadAt = 0
+	filePayloadGuestFDsAt    = 8
+	filePayloadSize          = 16
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*FilePayload)(nil)
+
+// MarshalZAP writes FilePayload from constant offsets.
+func (x *FilePayload) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(filePayloadSize + 256)
+	guestFDsAt, guestFDsN := 0, len(x.GuestFDs)
+	if guestFDsN > 0 {
+		var blob []byte
+		for i := range x.GuestFDs {
+			var full [8]byte
+			binary.LittleEndian.PutUint64(full[:], uint64(x.GuestFDs[i]))
+			enc := full[:8]
+			var n [4]byte
+			binary.LittleEndian.PutUint32(n[:], uint32(len(enc)))
+			blob = append(blob, n[:]...)
+			blob = append(blob, enc...)
+		}
+		guestFDsAt = b.WriteBytes(blob)
+	}
+	ob := b.StartObject(filePayloadSize)
+	innerFilePayload, err := x.FilePayload.MarshalZAP()
+	if err != nil {
+		return nil, err
+	}
+	ob.SetBytes(filePayloadFilePayloadAt, innerFilePayload)
+	if guestFDsN > 0 {
+		ob.SetList(filePayloadGuestFDsAt, guestFDsAt, guestFDsN)
+	}
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads FilePayload out of the buffer that arrived.
+func (x *FilePayload) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("FilePayload: %w", err)
+	}
+	o := m.Root()
+	if raw := o.Bytes(filePayloadFilePayloadAt); len(raw) > 0 {
+		if err := x.FilePayload.UnmarshalZAP(raw); err != nil {
+			return err
+		}
+	}
+	if l := o.List(filePayloadGuestFDsAt); l.Len() > 0 {
+		rows := make([]int, l.Len())
+		for i := range rows {
+			var full [8]byte
+			copy(full[:], l.BytesAt(i))
+			rows[i] = int(int64(binary.LittleEndian.Uint64(full[:])<<0) >> 0)
+		}
+		x.GuestFDs = rows
+	}
+	return nil
+}
+
 // ---- GetRegisteredMetricsOpts ------------------------------------------
 
 const (
@@ -1102,6 +1334,56 @@ func (x *MemoryUsageOpts) UnmarshalZAP(data []byte) error {
 	}
 	o := m.Root()
 	x.Full = bool(o.Bool(memoryUsageOptsFullAt))
+	return nil
+}
+
+// ---- MetricsExportData -------------------------------------------------
+
+const (
+	metricsExportDataSnapshotAt = 0
+	metricsExportDataSize       = 8
+)
+
+var _ interface {
+	MarshalZAP() ([]byte, error)
+	UnmarshalZAP([]byte) error
+} = (*MetricsExportData)(nil)
+
+// MarshalZAP writes MetricsExportData from constant offsets.
+func (x *MetricsExportData) MarshalZAP() ([]byte, error) {
+	if x == nil {
+		return nil, nil
+	}
+	b := zap.NewBuilder(metricsExportDataSize + 256)
+	ob := b.StartObject(metricsExportDataSize)
+	if x.Snapshot != nil {
+		innerSnapshot, err := x.Snapshot.MarshalZAP()
+		if err != nil {
+			return nil, err
+		}
+		ob.SetBytes(metricsExportDataSnapshotAt, innerSnapshot)
+	}
+	ob.FinishAsRoot()
+	return b.Finish(), nil
+}
+
+// UnmarshalZAP reads MetricsExportData out of the buffer that arrived.
+func (x *MetricsExportData) UnmarshalZAP(data []byte) error {
+	if x == nil || len(data) == 0 {
+		return nil
+	}
+	m, err := zap.Parse(data)
+	if err != nil {
+		return fmt.Errorf("MetricsExportData: %w", err)
+	}
+	o := m.Root()
+	if raw := o.Bytes(metricsExportDataSnapshotAt); len(raw) > 0 {
+		var v prometheus.Snapshot
+		if err := v.UnmarshalZAP(raw); err != nil {
+			return err
+		}
+		x.Snapshot = &v
+	}
 	return nil
 }
 
