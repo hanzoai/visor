@@ -1,0 +1,77 @@
+name: publish
+
+# A node must install the sandbox boundary from a VERIFIED artifact: every
+# binary ships beside its sha512, and universe's install.sh pins those digests,
+# so a tampered or truncated download aborts instead of running an unverified
+# boundary.
+#
+# Until this lane existed, the visor on each node was built by hand from a
+# working tree — 102MB nobody could reproduce, attribute to a commit, or check.
+#
+# It runs on OUR self-hosted pools, not GitHub's machines, and publishes with
+# the token every run is given, so there is no credential here that can rot.
+on:
+  push:
+    tags: ['visor-*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: An existing visor-* tag to publish
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  binaries:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runs-on: hanzo-linux-amd64
+          - arch: aarch64
+            runs-on: hanzo-linux-arm64
+    runs-on: ${{ matrix.runs-on }}
+    env:
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      # ONE bazel invocation for both, so the shim and the runtime it execs are
+      # always the same build. A shim paired with a runtime it was not built
+      # against fails at container start, after admission.
+      - name: Build
+        run: make copy TARGETS="//runsc:runsc //shim:containerd-shim-runsc-v1" DESTINATION=bin/
+
+      # The runtime installs as `visor` — the name the containerd handler and the
+      # RuntimeClass both use. Asking it for its version is the cheapest proof the
+      # bytes are ours: a binary reporting -gvisor is upstream's.
+      - name: Name the bytes and prove they are ours
+        run: |
+          set -eu
+          cd bin
+          mv runsc visor
+          chmod 0755 visor containerd-shim-runsc-v1
+          ./visor --version | tee version.txt
+          grep -q -- '-visor' version.txt || { echo "FATAL: this binary reports no -visor, so it is not our build"; exit 1; }
+          for f in visor containerd-shim-runsc-v1; do
+            sha512sum "$f" | awk '{print $1}' > "$f-${{ matrix.arch }}.sha512"
+            mv "$f" "$f-${{ matrix.arch }}"
+          done
+          ls -l
+
+      - name: Publish to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "$TAG" --notes "Verified visor binaries, built on our own runners."
+          cd bin
+          gh release upload "$TAG" \
+            "visor-${{ matrix.arch }}" "visor-${{ matrix.arch }}.sha512" \
+            "containerd-shim-runsc-v1-${{ matrix.arch }}" "containerd-shim-runsc-v1-${{ matrix.arch }}.sha512" \
+            --clobber
+          echo "published $(ls | tr '\n' ' ')"
