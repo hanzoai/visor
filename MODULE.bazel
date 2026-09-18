@@ -215,6 +215,7 @@ use_repo(
     "com_github_xeipuuv_gojsonpointer",
     "com_github_xeipuuv_gojsonreference",
     "com_github_xeipuuv_gojsonschema",
+    "com_github_zap_proto_go",
     "com_google_cloud_go",
     "com_google_cloud_go_auth",
     "com_google_cloud_go_auth_oauth2adapt",
