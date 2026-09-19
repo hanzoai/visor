@@ -75,9 +75,13 @@ jobs:
           # The RELEASE is pinned; no digest is asserted, because a checksum
           # nobody verified out-of-band is theatre. What this lane actually
           # proves is the binary it produces — the version gate below rejects
-          # anything that does not report -visor.
+          # anything not stamped with the tag being published.
+          #
+          # The asset is named after the pool: bazelisk publishes <os>-<arch>
+          # with exactly the labels our runners carry, so the download cannot
+          # be a different architecture from the machine that runs it.
           curl -fsSL -o "$HOME/.local/bin/bazel" \
-            https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-linux-amd64
+            "https://github.com/bazelbuild/bazelisk/releases/download/v1.25.0/bazelisk-${{ matrix.runs-on }}"
           chmod 0755 "$HOME/.local/bin/bazel"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           "$HOME/.local/bin/bazel" version
@@ -92,15 +96,25 @@ jobs:
 
       # The runtime installs as `visor` — the name the containerd handler and the
       # RuntimeClass both use. Asking it for its version is the cheapest proof the
-      # bytes are ours: a binary reporting -gvisor is upstream's.
-      - name: Name the bytes and prove they are ours
+      # bytes are this tag: .bazelrc stamps STABLE_VERSION from
+      # `git describe --always --tags` through runsc/BUILD's x_defs, and cli.go
+      # prints it as `runsc version <stamp>`. At a tag, describe returns the tag
+      # name — so an unstamped build (VERSION_MISSING), a build with no tag in
+      # reach (0.0.0 or a bare commit) and a modified tree (-dirty) all fail here.
+      #
+      # It does NOT print -visor. That suffix is the guest kernel's uname release
+      # in pkg/sentry/kernel/version/version.go, which only a process inside a
+      # running sandbox can read, so grepping the runtime's own --version for it
+      # could never pass: the gate burned a whole gVisor build to fail on its
+      # last line, having published nothing.
+      - name: Name the bytes and prove they are this tag
         run: |
           set -eu
           cd bin
           mv runsc visor
           chmod 0755 visor containerd-shim-runsc-v1
           ./visor --version | tee version.txt
-          grep -q -- '-visor' version.txt || { echo "FATAL: this binary reports no -visor, so it is not our build"; exit 1; }
+          grep -qx "runsc version $TAG" version.txt || { echo "FATAL: this binary is stamped $(head -1 version.txt), not $TAG"; exit 1; }
           for f in visor containerd-shim-runsc-v1; do
             sha512sum "$f" | awk '{print $1}' > "$f-${{ matrix.arch }}.sha512"
             mv "$f" "$f-${{ matrix.arch }}"
