@@ -10,6 +10,13 @@ name: publish
 #
 # It runs on OUR self-hosted pools, not GitHub's machines, and publishes with
 # the token every run is given, so there is no credential here that can rot.
+#
+# IT LIVES IN .hanzo/workflows FOR THAT REASON. Under .github/ it is a workflow
+# only GitHub Actions would run, and this estate has no runners there: the lane
+# sat at .github/workflows/publish.yml, tag visor-20260911.0 was pushed at a
+# commit that already carried it, and no release was ever created. A workflow in
+# the wrong directory does not fail — it waits, which reads exactly like a lane
+# nobody triggered.
 on:
   push:
     tags: ['visor-*']
@@ -29,7 +36,7 @@ jobs:
       matrix:
         include:
           - arch: x86_64
-            runs-on: hanzo-linux-amd64
+            runs-on: linux-amd64
           # aarch64 is NOT here yet, and that is a measurement: the runner image
           # oci.hanzo.ai/hanzoai/git-runner:5 is a single manifest, so an arm64
           # node cannot start it — its pods StartError and the job then sits
@@ -37,7 +44,7 @@ jobs:
           # back in the same commit that publishes a multi-arch runner image.
           #
           #   - arch: aarch64
-          #     runs-on: hanzo-linux-arm64
+          #     runs-on: linux-arm64
     runs-on: ${{ matrix.runs-on }}
     env:
       TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
