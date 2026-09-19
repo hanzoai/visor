@@ -18,12 +18,18 @@ package main
 
 import (
 	"errors"
+	"path"
 )
 
-// git passes argv through to git, run in the workspace. The ceiling keeps a
-// repository search from walking above the workspace root, so a request that
-// names no repository fails in the workspace instead of finding one outside
-// it.
+// git passes argv through to git, run in the workspace.
+//
+// The ceiling names the workspace's parent, not the workspace: git stops its
+// repository search at a ceiling directory on the way up, and a ceiling equal
+// to the directory it starts from is never on that way, so a ceiling of the
+// workspace itself would let a search that starts at the workspace root find
+// and write to a repository above it. With the parent as the ceiling, a
+// request that names no repository fails in the workspace — from the root and
+// from any directory under it.
 func (d *daemon) git(r *req) *rep {
 	if r.command != "" {
 		return fail(r, errors.New("git takes argv, not a command"))
@@ -33,7 +39,7 @@ func (d *daemon) git(r *req) *rep {
 	}
 	argv := append([]string{"git"}, r.argv...)
 	return d.run(r, argv, []string{
-		"GIT_CEILING_DIRECTORIES=" + d.root.name,
+		"GIT_CEILING_DIRECTORIES=" + path.Dir(d.root.name),
 		"GIT_DISCOVERY_ACROSS_FILESYSTEM=0",
 	})
 }

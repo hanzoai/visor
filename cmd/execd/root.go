@@ -26,8 +26,9 @@ import (
 )
 
 // root is the workspace. Every path in a request is resolved relative to it
-// with RESOLVE_BENEATH, so the kernel — not a string check — rejects "..",
-// an absolute path, and a symlink that leaves the tree.
+// with RESOLVE_BENEATH, so the kernel — not a string check — rejects an
+// absolute path, a ".." that would leave the workspace, and a symlink that
+// points out of it. A ".." that stays inside resolves normally.
 type root struct {
 	fd   int    // O_PATH descriptor of the workspace directory
 	name string // its canonical absolute path
@@ -101,9 +102,11 @@ func (r *root) abs(p string) (string, error) {
 
 // parent resolves p's directory beneath the workspace and returns its
 // descriptor together with p's last component, which is what an atomic
-// create-then-rename needs.
+// create-then-rename needs. The directory is handed to the kernel as written,
+// never cleaned first: "away/../f" through a symlink out of the tree has to
+// mean here what it means to a read.
 func (r *root) parent(p string) (int, string, error) {
-	dir, base := path.Split(path.Clean(p))
+	dir, base := path.Split(p)
 	if base == "" || base == "." || base == ".." {
 		return -1, "", fmt.Errorf("%s: not a file name", p)
 	}

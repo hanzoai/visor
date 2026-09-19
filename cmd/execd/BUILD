@@ -1,12 +1,12 @@
-load("//tools:defs.bzl", "go_binary", "go_test")
+load("//tools:defs.bzl", "go_binary", "go_library", "go_test")
 
 package(
     default_applicable_licenses = ["//:license"],
     licenses = ["notice"],
 )
 
-go_binary(
-    name = "execd",
+go_library(
+    name = "lib",
     srcs = [
         "exec.go",
         "file.go",
@@ -20,8 +20,7 @@ go_binary(
         "serve.go",
         "watch.go",
     ],
-    pure = True,
-    visibility = ["//visibility:public"],
+    stateify = False,
     deps = [
         "@com_github_creack_pty//:go_default_library",
         "@com_github_zap_proto_go//:go_default_library",
@@ -29,9 +28,18 @@ go_binary(
     ],
 )
 
+# The sources are the library's, so nogo analyses them there.
+go_binary(
+    name = "execd",
+    embed = [":lib"],
+    nogo = False,
+    pure = True,
+    visibility = ["//visibility:public"],
+)
+
 go_test(
     name = "execd_test",
-    size = "small",
+    size = "medium",
     srcs = [
         "frame_test.go",
         "ledger_test.go",
@@ -39,6 +47,6 @@ go_test(
         "root_test.go",
         "serve_test.go",
     ],
-    library = ":execd",
+    library = ":lib",
     deps = ["@org_golang_x_sys//unix:go_default_library"],
 )

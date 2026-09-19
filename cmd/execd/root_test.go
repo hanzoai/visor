@@ -127,3 +127,40 @@ func TestRootParentIsInsideToo(t *testing.T) {
 		t.Fatal("the parent of a path outside the workspace resolved")
 	}
 }
+
+// A path is resolved by the kernel for a write as well as for a read, so one
+// string cannot mean two places. away is a symlink out of the workspace, so
+// "away/../f" leaves it even though the string alone looks like it stays.
+func TestRootParentRefusesWhatTheKernelRefuses(t *testing.T) {
+	r, _ := tree(t)
+	for _, p := range []string{
+		"away/../escaped",
+		"../outside/planted",
+		"/tmp/planted",
+		"src/../../outside/planted",
+	} {
+		if fd, _, err := r.parent(p); err == nil {
+			unix.Close(fd)
+			t.Errorf("the parent of %s resolved; a read of it is refused", p)
+		}
+	}
+}
+
+// RESOLVE_BENEATH refuses a ".." that escapes, not every "..".
+func TestRootTakesADotDotThatStaysInside(t *testing.T) {
+	r, _ := tree(t)
+	fd, err := r.open("src/../src/main.go", unix.O_RDONLY, 0)
+	if err != nil {
+		t.Fatalf("src/../src/main.go: %v", err)
+	}
+	unix.Close(fd)
+
+	fd, base, err := r.parent("src/../src/main.go")
+	if err != nil {
+		t.Fatalf("parent: %v", err)
+	}
+	unix.Close(fd)
+	if base != "main.go" {
+		t.Fatalf("got base %q", base)
+	}
+}

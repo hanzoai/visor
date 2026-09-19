@@ -175,6 +175,12 @@ type rep struct {
 	err     string
 	path    string
 	entries []entry
+
+	// refused marks an answer to a request that was not carried out: the
+	// reason travels in err, nothing in the workspace changed, and the ledger
+	// records nothing, so asking again runs it. It is the daemon's own note
+	// and is not encoded.
+	refused bool
 }
 
 // entry is one name in a directory listing.
@@ -358,8 +364,8 @@ func entries(b *zap.Builder, es []entry) (int, int) {
 	return off, len(es)
 }
 
-// fail is the reply to a request that could not be carried out. The reason
-// travels with the action id; nothing is ever answered with a false success.
+// fail is the reply to a request that was not carried out. The reason travels
+// with the action id; nothing is ever answered with a false success.
 func fail(r *req, err error) *rep {
-	return &rep{op: r.op, kind: kindReply, id: r.id, exit: -1, err: err.Error()}
+	return &rep{op: r.op, kind: kindReply, id: r.id, exit: -1, err: err.Error(), refused: true}
 }

@@ -27,8 +27,12 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// ledgerMax is how many completed actions keep their result.
-const ledgerMax = 1024
+const (
+	// ledgerMax is how many completed actions keep their result.
+	ledgerMax = 1024
+	// ledgerRoom is how many bytes those results may take together.
+	ledgerRoom = 8 << 20
+)
 
 // daemon serves one connected descriptor. It holds a workspace, the action
 // ledger, and the live pty and watch handles.
@@ -67,7 +71,7 @@ type handle struct {
 func newDaemon(fd int, r *root) *daemon {
 	return &daemon{
 		root:    r,
-		ledger:  newLedger(ledgerMax),
+		ledger:  newLedger(ledgerMax, ledgerRoom),
 		fd:      fd,
 		out:     make(chan []byte, 64),
 		end:     make(chan struct{}),
@@ -94,7 +98,17 @@ func (d *daemon) serve() error {
 			break
 		}
 		if n == 0 {
-			break // the host closed its end
+			// A zero-length packet is a packet, so the socket and not the
+			// length says whether the host is gone.
+			gone, perr := hangup(d.fd)
+			if perr != nil {
+				err = fmt.Errorf("poll: %w", perr)
+				break
+			}
+			if gone {
+				break // the host closed its end
+			}
+			continue // an empty packet asks for nothing
 		}
 		if n > len(buf) {
 			d.refuseOversize(buf, n)
@@ -115,6 +129,22 @@ func (d *daemon) serve() error {
 	close(d.end)
 	<-d.gone
 	return err
+}
+
+// hangup reports whether the host has closed its end or shut down its side of
+// it. A sequenced-packet socket delivers a zero-length packet as readable, so
+// this is what tells an empty packet from end of file.
+func hangup(fd int) (bool, error) {
+	fds := []unix.PollFd{{Fd: int32(fd), Events: unix.POLLRDHUP}}
+	for {
+		if _, err := unix.Poll(fds, 0); err != nil {
+			if err == unix.EINTR {
+				continue
+			}
+			return false, err
+		}
+		return fds[0].Revents&(unix.POLLRDHUP|unix.POLLHUP) != 0, nil
+	}
 }
 
 // writer owns the descriptor's send side: one frame per packet, in order.
@@ -154,13 +184,16 @@ func (d *daemon) send(r *rep) {
 	d.push(r.encode())
 }
 
-// refuseOversize answers a request too large to receive. The id sits at a
-// fixed offset, so the truncated head is enough to name the action.
+// refuseOversize answers a request too large to receive. The op and the id sit
+// at fixed offsets, so the truncated head is enough to name both.
 func (d *daemon) refuseOversize(head []byte, n int) {
 	r := &req{}
 	if len(head) >= zap.HeaderSize {
-		off := int(binary.LittleEndian.Uint32(head[8:12])) + reqID
-		if off >= 0 && off+8 <= len(head) {
+		at := int(binary.LittleEndian.Uint32(head[8:12]))
+		if off := at + reqOp; off >= 0 && off < len(head) {
+			r.op = head[off]
+		}
+		if off := at + reqID; off >= 0 && off+8 <= len(head) {
 			r.id = binary.LittleEndian.Uint64(head[off:])
 		}
 	}
@@ -186,9 +219,18 @@ func (d *daemon) dispatch(frame []byte) {
 	reply.op, reply.kind, reply.id = r.op, kindReply, r.id
 	out := reply.encode()
 	if len(out) > frameMax {
-		out = fail(r, fmt.Errorf("reply is %d bytes, over the %d byte frame", len(out), frameMax)).encode()
+		big := fail(r, fmt.Errorf("reply is %d bytes, over the %d byte frame", len(out), frameMax))
+		// The action still happened if it happened; only the answer is gone.
+		big.refused = reply.refused
+		out = big.encode()
 	}
-	d.ledger.finish(r.id, out)
+	if reply.refused {
+		// Nothing happened, so there is nothing to replay and a repeat of the
+		// id runs.
+		d.ledger.drop(r.id)
+	} else {
+		d.ledger.finish(r.id, out)
+	}
 	d.push(out)
 }
 

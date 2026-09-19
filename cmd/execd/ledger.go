@@ -25,24 +25,29 @@ import (
 // a request the host repeats after losing an answer is answered from the
 // record instead of run a second time.
 //
-// It is bounded by count: the last max replies are held, and the max ids
-// evicted before those are kept as bare marks — enough to refuse a repeat
-// whose result is gone rather than run the effect twice.
+// It is bounded twice, by count and by bytes: the newest replies are held
+// while they are no more than max of them and take no more than room
+// together, and the max ids evicted before those are kept as bare marks —
+// enough to refuse a repeat whose result is gone rather than run the effect
+// twice.
 type ledger struct {
 	mu   sync.Mutex
 	max  int
+	room int               // bytes the held replies may take together
+	held int               // bytes they take now
 	done map[uint64][]byte // nil value: completed, result no longer held
 	kept []uint64          // ids whose result is held, oldest first
 	mark []uint64          // ids kept as marks, oldest first
 	live map[uint64]bool
 }
 
-func newLedger(max int) *ledger {
+func newLedger(max, room int) *ledger {
 	if max < 1 {
 		max = 1
 	}
 	return &ledger{
 		max:  max,
+		room: room,
 		done: make(map[uint64][]byte, 2*max),
 		live: make(map[uint64]bool),
 	}
@@ -80,9 +85,11 @@ func (l *ledger) finish(id uint64, frame []byte) {
 	}
 	l.done[id] = frame
 	l.kept = append(l.kept, id)
-	for len(l.kept) > l.max {
+	l.held += len(frame)
+	for len(l.kept) > l.max || (l.held > l.room && len(l.kept) > 1) {
 		old := l.kept[0]
 		l.kept = l.kept[1:]
+		l.held -= len(l.done[old])
 		l.done[old] = nil
 		l.mark = append(l.mark, old)
 	}
@@ -93,7 +100,9 @@ func (l *ledger) finish(id uint64, frame []byte) {
 	}
 }
 
-// drop releases an id that never completed, so the host may retry it.
+// drop releases an id, so a repeat of it runs. It is what a refused request
+// gets: nothing happened, so there is no result to record and nothing to
+// replay.
 func (l *ledger) drop(id uint64) {
 	l.mu.Lock()
 	defer l.mu.Unlock()

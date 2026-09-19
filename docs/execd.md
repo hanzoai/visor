@@ -64,8 +64,9 @@ Two things to keep true:
 - Nothing else may be handed in below FD 3, or the numbering shifts. `execd`
   takes `-fd` for the case where the host cannot place it at 3.
 
-The host keeps `mine` and speaks ZAP on it. When the host closes its end,
-`execd`'s read returns end of file, every pty is killed, every watch is closed
+The host keeps `mine` and speaks ZAP on it. A zero-length packet is a packet
+like any other and asks for nothing — it is the socket, not a length, that says
+the host has hung up. When it has, every pty is killed, every watch is closed
 and the process exits.
 
 ## The protocol
@@ -91,9 +92,25 @@ replies can arrive in any order — match on the id, never on arrival order.
 | `patch` | 11 | `data` (a unified diff) | `entries` (the files changed), `size` |
 | `git` | 12 | `argv`, `dir`, `timeout` | `exit`, `data`, `log` |
 
-A reply whose `err` is set did not happen. `err` is a sentence, not a code:
-`../outside/secret: invalid cross-device link`, `no answer within 200ms`,
-`src/main.go:2: the file has "x" where the diff expects "two"`.
+`mode` is permission bits — `0644`, `0755` — in a request and in every reply
+that carries one. Whether a path is a directory is `flags`, not the mode.
+
+### A reply that did not happen, and one that did
+
+`err` is a sentence, not a code: `away/secret: invalid cross-device link`,
+`no answer within 200ms`, `src/main.go:2: the file has "x" where the diff
+expects "two"`. There are two kinds of it, and which one it is decides what a
+repeat of the id does.
+
+- **Refused.** The request was not carried out: a path outside the workspace, a
+  diff that does not fit, `argv` and `command` both set, a handle that is gone,
+  a frame over the bound, a program that could not be started. Nothing changed,
+  so nothing is recorded and the same id sent again runs.
+- **What came of it.** The action ran and this is its outcome: a nonzero
+  `exit`, `killed by SIGKILL`, `no answer within 200ms` for a command its
+  deadline killed and that may have left half its work behind. It is recorded
+  under its id like any other answer. Running it again is a new action and
+  takes an id of its own.
 
 ### Kinds
 
@@ -110,17 +127,19 @@ it.
 
 ### An action happens once
 
-The ledger records each completed action's reply under its id. A repeated id
-is answered from that record and the effect is **not** run again: if the host
-loses an answer to `Exec{id: 7821, argv: ["cargo", "test"]}`, asking again
+The ledger records the reply of every action that ran, under its id. A repeated
+id is answered from that record and the effect is **not** run again: if the
+host loses an answer to `Exec{id: 7821, argv: ["cargo", "test"]}`, asking again
 returns the recorded result rather than a second test run. The same holds for
-`git commit`, a write and a patch.
+`git commit`, a write and a patch. A refused request is not recorded, because
+nothing happened.
 
-The table is bounded by count: the last 1024 replies are held, and the 1024
-ids before those are kept as bare marks. An id whose result was evicted is
-refused (`action N completed and its result is no longer held`) rather than
-run twice. Past that window an id is forgotten and a repeat of it runs, so a
-host that may replay should not reuse an id older than the window.
+The table is bounded twice, by count and by bytes: the newest 1024 replies are
+held while they take no more than 8 MiB together, and the 1024 ids evicted
+before those are kept as bare marks. An id whose result was evicted is refused
+(`action N completed and its result is no longer held`) rather than run twice.
+Past that window an id is forgotten and a repeat of it runs, so a host that may
+replay should not reuse an id older than the window.
 
 An id still running is refused with `action N is already running`. An id of
 zero is refused: every action carries one.
@@ -128,39 +147,70 @@ zero is refused: every action carries one.
 ## The workspace is the boundary
 
 Every path in a request is resolved relative to `-workspace` with
-`openat2(RESOLVE_BENEATH | RESOLVE_NO_MAGICLINKS)`. The kernel does the
-refusing, not a string check, so all of these fail:
+`openat2(RESOLVE_BENEATH | RESOLVE_NO_MAGICLINKS)` — for a write and a patch as
+much as for a read, and on the path as it was written rather than on a cleaned
+copy of it, so one string cannot mean two places. The kernel does the refusing,
+not a string check:
 
-- `../outside/secret`, and any `..` at all — even one that would stay inside
+- `../outside/secret`, and any `..` that would leave the workspace
 - `/etc/passwd`, and any absolute path
-- a symlink whose target leaves the tree
+- a symlink whose target leaves the tree, and any path through one
 - an absolute symlink, even one aimed back inside the workspace, because
   resolution would restart at `/`
 
-A relative symlink that stays beneath the workspace is followed normally.
+A `..` that stays beneath the workspace resolves normally, so `src/../src/main.go`
+is `src/main.go`; so does a relative symlink that stays beneath it.
 
 `exec` and `git` take their working directory the same way, and run in the
-resolved directory. `git` also gets `GIT_CEILING_DIRECTORIES` set to the
-workspace, so a repository search cannot walk above it, and
-`GIT_DISCOVERY_ACROSS_FILESYSTEM=0`. `git` takes `argv` only: a command
-string for a shell is refused.
+resolved directory.
+
+`git` gets `GIT_CEILING_DIRECTORIES` set to the workspace's **parent**, not to
+the workspace. git stops a repository search at a ceiling directory on the way
+up, and a ceiling equal to the directory the search starts from is never on
+that way — so a ceiling of the workspace itself would leave a request that runs
+at the workspace root free to find, read and write a repository above it. With
+the parent as the ceiling, a request that names no repository fails in the
+workspace, from the root and from any directory under it.
+`GIT_DISCOVERY_ACROSS_FILESYSTEM=0` is set as well. `git` takes `argv` only: a
+command string for a shell is refused.
+
+A child starts from a declared environment — `PATH`, `LANG`, `TERM` — or from
+the `env` the request names, and never from the daemon's own, so nothing the
+host handed `execd` reaches a command unasked.
 
 ## Writing is atomic, not durable
 
-`write` and `patch` write a temporary file beside the target and rename over
-it, so a reader sees the old bytes or the new ones and never a half-written
-file. `patch` verifies and stages **every** file in the diff before renaming
-any of them: a diff whose second file does not fit changes nothing.
+`write` and `patch` fill a staged file beside the target and rename over it, so
+a reader sees the old bytes or the new ones and never a half-written file. The
+staged name is `.execd` and a random suffix — a name no request can name, so a
+file the workspace already holds is never in the way of a write.
+
+`write` sets the mode: the one the request names, or the one the file already
+has, or `0644` for a file that is new. The reply names the mode the file ended
+up with, not the one that was asked for.
+
+`patch` is all or nothing. Every file in the diff is read, its hunks applied
+and the result staged before anything is moved, and a file that was already
+there is kept on a second hard link until every move has landed. So a diff
+whose second file does not fit changes nothing, and a move that fails puts back
+the moves before it. A diff that names one file twice is refused, as is one
+that gives two names for one file, and one that would delete a directory.
 
 There is no `fsync`. The workspace is served to the sandbox by the host, which
 caches locally and persists to s3; making bytes durable is the host's job, and
 an fsync per write inside the cell buys nothing and can cost seconds.
 
-The diff `patch` reads is a plain unified diff: `---`/`+++` headers with the
-`a/` and `b/` prefixes git writes, `@@` hunks, `/dev/null` on one side for a
-file created or deleted, and `\ No newline at end of file`. Anything else is
-refused with the line number. A context or removed line that does not match
-the file is refused with what was there and what the diff expected.
+The diff `patch` reads is a plain unified diff: `---`/`+++` headers, `@@`
+hunks, `/dev/null` on one side for a file created or deleted, and `\ No newline
+at end of file`. Anything else is refused with the line number.
+
+The path is the reading that makes the two header lines agree: `a/src/main.go`
+and `b/src/main.go` are both `src/main.go`, while a diff written with no
+prefixes names the path it writes even when that path starts with `a/`. A pair
+that agrees under neither reading is refused instead of guessed at, and so is a
+`rename from`/`rename to` pair, which a diff of hunks cannot express — send the
+delete and the create. A context or removed line that does not match the file
+is refused with what was there and what the diff expected.
 
 ## Bounds
 
@@ -169,11 +219,14 @@ the file is refused with what was there and what the diff expected.
 | one frame | 128 KiB | refused with the size |
 | one read | 96 KiB | refused; ask for a range |
 | stdout, stderr per `exec` | 48 KiB each | kept bytes plus `err` saying how many were dropped |
-| one listing | 4096 entries | page it with `off` and `length` |
-| ledger | 1024 results, 1024 marks | an evicted id is refused, not re-run |
+| one listing | what a frame holds | keep going from `off` |
+| ledger | 1024 results, 8 MiB, 1024 marks | an evicted id is refused, not re-run |
 
-A listing is sorted by name, because a page is only meaningful against a
-stable order.
+A listing is sorted by name, because a page is only meaningful against a stable
+order, and answers with the entries from `off` that fit in one frame. `size` is
+the whole directory's count, so a host pages by advancing `off` by the number
+of entries it got. A read whose offset is past the end of the file is refused
+rather than answered with no bytes.
 
 ## Build
 

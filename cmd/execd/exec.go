@@ -21,7 +21,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 	"syscall"
@@ -34,6 +33,26 @@ const outMax = 48 << 10
 
 // shell is what a command string is handed to.
 var shell = []string{"/bin/sh", "-c"}
+
+// preset is the environment a child starts from when a request declares none.
+// It is a stated list, not whatever the daemon happens to hold, so nothing the
+// host handed execd reaches a child unasked.
+var preset = []string{
+	"PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+	"LANG=C.UTF-8",
+	"TERM=xterm-256color",
+}
+
+// environ settles a child's environment: what the request declared, or the
+// preset, and then extra.
+func environ(r *req, extra ...string) []string {
+	env := preset
+	if len(r.env) > 0 {
+		env = r.env
+	}
+	out := make([]string, 0, len(env)+len(extra))
+	return append(append(out, env...), extra...)
+}
 
 func (d *daemon) exec(r *req) *rep {
 	argv, err := argvOf(r)
@@ -72,14 +91,9 @@ func (d *daemon) run(r *req, argv []string, extra []string) *rep {
 	}
 	defer stop()
 
-	env := os.Environ()
-	if len(r.env) > 0 {
-		env = r.env
-	}
-
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Dir = dir
-	cmd.Env = append(append([]string{}, env...), extra...)
+	cmd.Env = environ(r, extra...)
 	if len(r.data) > 0 {
 		cmd.Stdin = bytes.NewReader(r.data)
 	}
@@ -110,8 +124,13 @@ func (d *daemon) run(r *req, argv []string, extra []string) *rep {
 		if st, ok := exit.Sys().(syscall.WaitStatus); ok && st.Signaled() {
 			reply.err = fmt.Sprintf("killed by %s", st.Signal())
 		}
-	default:
+	case cmd.Process == nil:
+		// It never started, so nothing happened and asking again is free.
 		return fail(r, fmt.Errorf("%s: %w", argv[0], werr))
+	default:
+		// It ran; whatever went wrong after that is its outcome.
+		reply.exit = -1
+		reply.err = fmt.Sprintf("%s: %v", argv[0], werr)
 	}
 	if note := strings.TrimSpace(out.note("stdout") + " " + log.note("stderr")); note != "" {
 		if reply.err != "" {

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build linux
+
 // execd runs inside a visor sandbox and does what a coding agent asks of an
 // operating system: run a program, drive a pty, read and write files, watch
 // them, apply a diff, run git. It knows nothing about models, sessions or
@@ -20,8 +22,6 @@
 // It serves ZAP frames on one descriptor it inherits already connected: FD 3,
 // one end of a SOCK_SEQPACKET socketpair the host made. There is no listen,
 // no connect and no path in a filesystem. See docs/execd.md.
-//go:build linux
-
 package main
 
 import (

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -45,104 +46,201 @@ type hunk struct {
 	noEndNew bool // the new side ends without a newline
 }
 
+// move is one file's worth of a staged diff: what goes in, what was there,
+// and the directory both of them live in.
+type move struct {
+	dirfd int
+	base  string
+	path  string
+	next  string // the staged replacement; empty when the diff deletes the file
+	prev  string // a link to the bytes that were there; empty when there were none
+}
+
 // patch applies a unified diff. Every file is verified and staged first, and
-// only then renamed into place, so a diff that does not fit changes nothing.
+// the bytes that were there are kept on a second link, so a diff that does
+// not fit changes nothing and a move that fails is put back.
 func (d *daemon) patch(r *req) *rep {
 	changes, err := parseDiff(string(r.data))
 	if err != nil {
 		return fail(r, err)
 	}
 	if len(changes) == 0 {
-		return fail(r, fmt.Errorf("the diff names no file"))
+		return fail(r, errors.New("the diff names no file"))
 	}
 
-	type staged struct {
-		dirfd int
-		tmp   string
-		base  string
-		kill  bool
-		path  string
+	work, err := d.plan(changes)
+	if err != nil {
+		return fail(r, err)
 	}
-	var work []staged
-	clean := func() {
-		for _, s := range work {
-			if !s.kill {
-				unix.Unlinkat(s.dirfd, s.tmp, 0)
-			}
-			unix.Close(s.dirfd)
-		}
+	defer release(work)
+
+	if untouched, err := commit(work); err != nil {
+		reply := fail(r, err)
+		// A diff that was put back did not happen; one the daemon could not
+		// put back did, and says so, so a repeat of the id is not run again.
+		reply.refused = untouched
+		return reply
 	}
 
+	reply := &rep{size: uint64(len(work))}
+	for _, m := range work {
+		reply.entries = append(reply.entries, entry{name: m.path})
+	}
+	return reply
+}
+
+// plan verifies and stages every change. Nothing in the workspace is moved
+// yet: on the way out with an error, every staged file is gone.
+func (d *daemon) plan(changes []change) ([]move, error) {
+	var work []move
+	seen := make(map[[2]uint64]string, len(changes))
 	for _, c := range changes {
-		dirfd, base, err := d.root.parent(c.path)
+		m, err := d.arrange(c, seen)
 		if err != nil {
-			clean()
-			return fail(r, err)
+			release(work)
+			return nil, err
 		}
-		s := staged{dirfd: dirfd, base: base, kill: c.kill, path: c.path}
-		if c.kill {
-			if _, err := d.root.open(c.path, unix.O_PATH, 0); err != nil {
-				unix.Close(dirfd)
-				clean()
-				return fail(r, err)
-			}
-			work = append(work, s)
-			continue
-		}
+		work = append(work, m)
+	}
+	return work, nil
+}
 
+// arrange stages one change: the new bytes in a file of their own, and a link
+// to the old bytes to go back to. seen holds the files the diff has already
+// named, by identity, so two spellings of one file are refused rather than
+// applied one over the other.
+func (d *daemon) arrange(c change, seen map[[2]uint64]string) (move, error) {
+	dirfd, base, err := d.root.parent(c.path)
+	if err != nil {
+		return move{}, err
+	}
+	m := move{dirfd: dirfd, base: base, path: c.path}
+	kept := false
+	defer func() {
+		if !kept {
+			release([]move{m})
+		}
+	}()
+
+	var st unix.Stat_t
+	here := unix.Fstatat(dirfd, base, &st, 0) == nil
+	switch {
+	case here && st.Mode&unix.S_IFMT == unix.S_IFDIR:
+		return move{}, fmt.Errorf("%s: is a directory", c.path)
+	case here:
+		if first, ok := seen[[2]uint64{st.Dev, st.Ino}]; ok {
+			return move{}, fmt.Errorf("the diff names %s and %s, which are one file", first, c.path)
+		}
+		seen[[2]uint64{st.Dev, st.Ino}] = c.path
+	case c.kill:
+		return move{}, fmt.Errorf("delete %s: %w", c.path, unix.ENOENT)
+	}
+
+	if !c.kill {
 		old, mode, err := d.current(c.path)
 		if err != nil {
-			unix.Close(dirfd)
-			clean()
-			return fail(r, err)
+			return move{}, err
 		}
 		next, err := apply(c.path, old, c.hunks)
 		if err != nil {
-			unix.Close(dirfd)
-			clean()
-			return fail(r, err)
+			return move{}, err
 		}
-		s.tmp = stage(base, r.id)
-		unix.Unlinkat(dirfd, s.tmp, 0)
-		fd, err := d.root.openAt(dirfd, s.tmp, unix.O_WRONLY|unix.O_CREAT|unix.O_EXCL, mode)
+		name, fd, err := d.stage(dirfd, mode)
 		if err != nil {
-			unix.Close(dirfd)
-			clean()
-			return fail(r, err)
+			return move{}, err
 		}
-		f := os.NewFile(uintptr(fd), s.tmp)
-		_, werr := f.Write(next)
-		cerr := f.Close()
-		if werr == nil {
-			werr = cerr
+		m.next = name
+		if _, err := settle(os.NewFile(uintptr(fd), name), next, mode); err != nil {
+			return move{}, err
 		}
-		if werr != nil {
-			unix.Unlinkat(dirfd, s.tmp, 0)
-			unix.Close(dirfd)
-			clean()
-			return fail(r, werr)
-		}
-		work = append(work, s)
 	}
+	if here {
+		prev, err := link(dirfd, base)
+		if err != nil {
+			return move{}, fmt.Errorf("keep %s to go back to: %w", c.path, err)
+		}
+		m.prev = prev
+	}
+	kept = true
+	return m, nil
+}
 
-	reply := &rep{}
-	for _, s := range work {
-		if s.kill {
-			if err := unix.Unlinkat(s.dirfd, s.base, 0); err != nil {
-				clean()
-				return fail(r, fmt.Errorf("delete %s: %w", s.path, err))
-			}
-		} else if err := unix.Renameat(s.dirfd, s.tmp, s.dirfd, s.base); err != nil {
-			clean()
-			return fail(r, fmt.Errorf("rename over %s: %w", s.path, err))
+// link hard-links the file at base beside it under a name nothing else can
+// name. The link holds the old bytes whatever happens to base.
+func link(dirfd int, base string) (string, error) {
+	for try := 0; try < 4; try++ {
+		name, err := scratch()
+		if err != nil {
+			return "", err
 		}
-		reply.entries = append(reply.entries, entry{name: s.path})
+		err = unix.Linkat(dirfd, base, dirfd, name, 0)
+		if err == nil {
+			return name, nil
+		}
+		if !errors.Is(err, unix.EEXIST) {
+			return "", err
+		}
 	}
-	for _, s := range work {
-		unix.Close(s.dirfd)
+	return "", fmt.Errorf("no free name beside %s", base)
+}
+
+// commit moves every staged file into place. A move that fails puts back the
+// moves before it; the bool says whether the tree is as it was, which is what
+// decides whether the action can be asked for again.
+func commit(work []move) (bool, error) {
+	var err error
+	for i, m := range work {
+		if m.next == "" {
+			err = unix.Unlinkat(m.dirfd, m.base, 0)
+			if err != nil {
+				err = fmt.Errorf("delete %s: %w", m.path, err)
+			}
+		} else if err = unix.Renameat(m.dirfd, m.next, m.dirfd, m.base); err != nil {
+			err = fmt.Errorf("rename over %s: %w", m.path, err)
+		}
+		if err == nil {
+			continue
+		}
+		if back := undo(work[:i]); back != nil {
+			return false, fmt.Errorf("%w; and %d of %d files are changed: %w", err, i, len(work), back)
+		}
+		return true, err
 	}
-	reply.size = uint64(len(work))
-	return reply
+	return false, nil
+}
+
+// undo puts back what commit has moved, newest first: a file that was there is
+// restored from its link, and one the diff created is removed.
+func undo(work []move) error {
+	for i := len(work) - 1; i >= 0; i-- {
+		m := work[i]
+		if m.prev != "" {
+			if err := unix.Renameat(m.dirfd, m.prev, m.dirfd, m.base); err != nil {
+				return fmt.Errorf("put %s back: %w", m.path, err)
+			}
+			continue
+		}
+		if err := unix.Unlinkat(m.dirfd, m.base, 0); err != nil {
+			return fmt.Errorf("take %s away again: %w", m.path, err)
+		}
+	}
+	return nil
+}
+
+// release lets go of staged work. Before commit it takes the staged files and
+// the links away; after commit the staged file is the file and the link is the
+// last hold on the bytes it replaced, so the same call is what finishes a
+// delete and frees what a write replaced.
+func release(work []move) {
+	for _, m := range work {
+		if m.next != "" {
+			unix.Unlinkat(m.dirfd, m.next, 0)
+		}
+		if m.prev != "" {
+			unix.Unlinkat(m.dirfd, m.prev, 0)
+		}
+		unix.Close(m.dirfd)
+	}
 }
 
 // current reads the file a change applies to. A file the diff creates is
@@ -174,6 +272,7 @@ func parseDiff(text string) ([]change, error) {
 	var out []change
 	var cur *change
 	var h *hunk
+	named := make(map[string]string)
 
 	for i := 0; i < len(lines); i++ {
 		line := lines[i]
@@ -182,16 +281,15 @@ func parseDiff(text string) ([]change, error) {
 			if i+1 >= len(lines) || !strings.HasPrefix(lines[i+1], "+++ ") {
 				return nil, fmt.Errorf("line %d: --- without +++", i+1)
 			}
-			from := diffPath(line[4:])
-			to := diffPath(lines[i+1][4:])
+			name, kill, err := sides(line[4:], lines[i+1][4:])
 			i++
-			name, kill := to, false
-			if to == null {
-				name, kill = from, true
+			if err != nil {
+				return nil, fmt.Errorf("line %d: %w", i+1, err)
 			}
-			if name == null || name == "" {
-				return nil, fmt.Errorf("line %d: the file has no name", i+1)
+			if first, ok := named[path.Clean(name)]; ok {
+				return nil, fmt.Errorf("line %d: the diff already changes %s", i+1, first)
 			}
+			named[path.Clean(name)] = name
 			out = append(out, change{path: name, kill: kill})
 			cur, h = &out[len(out)-1], nil
 
@@ -221,9 +319,12 @@ func parseDiff(text string) ([]change, error) {
 				return nil, fmt.Errorf("line %d: an empty line inside a hunk", i+1)
 			}
 
+		case strings.HasPrefix(line, "rename ") || strings.HasPrefix(line, "copy "):
+			return nil, fmt.Errorf("line %d: %q moves a file, which a diff of hunks cannot say; send the delete and the create", i+1, strings.TrimSpace(line))
+
 		case strings.HasPrefix(line, "diff ") || strings.HasPrefix(line, "index ") ||
 			strings.HasPrefix(line, "old mode") || strings.HasPrefix(line, "new mode") ||
-			strings.HasPrefix(line, "similarity") || strings.HasPrefix(line, "rename ") ||
+			strings.HasPrefix(line, "similarity") ||
 			strings.HasPrefix(line, "new file") || strings.HasPrefix(line, "deleted file") ||
 			strings.HasPrefix(line, "Binary files"):
 			h = nil
@@ -235,21 +336,38 @@ func parseDiff(text string) ([]change, error) {
 	return out, nil
 }
 
-// diffPath drops a timestamp column and the a/ or b/ prefix git writes.
-func diffPath(s string) string {
-	if i := strings.IndexAny(s, "\t"); i >= 0 {
+// sides settles the file a diff section changes. git writes the path behind
+// a/ on the --- line and behind b/ on the +++ line; a diff written with no
+// prefixes writes the path itself on both. The reading that makes the two
+// lines agree is the path, and a pair that agrees under neither reading is
+// refused instead of guessed at.
+func sides(from, to string) (string, bool, error) {
+	from, to = column(from), column(to)
+	stripped := [2]string{strings.TrimPrefix(from, "a/"), strings.TrimPrefix(to, "b/")}
+	switch {
+	case from == "" || to == "":
+		return "", false, errors.New("the file has no name")
+	case from == null && to == null:
+		return "", false, errors.New("both sides are /dev/null")
+	case to == null:
+		return stripped[0], true, nil
+	case from == null:
+		return stripped[1], false, nil
+	case stripped[0] == stripped[1]:
+		return stripped[1], false, nil
+	case from == to:
+		return to, false, nil
+	}
+	return "", false, fmt.Errorf("the diff changes %s on one side and %s on the other", from, to)
+}
+
+// column drops the timestamp a diff may write in a second column after the
+// path.
+func column(s string) string {
+	if i := strings.IndexByte(s, '\t'); i >= 0 {
 		s = s[:i]
 	}
-	s = strings.TrimSpace(s)
-	if s == null {
-		return s
-	}
-	for _, p := range []string{"a/", "b/"} {
-		if strings.HasPrefix(s, p) {
-			return s[len(p):]
-		}
-	}
-	return s
+	return strings.TrimSpace(s)
 }
 
 // parseHunk reads "@@ -old,count +new,count @@".

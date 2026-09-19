@@ -43,9 +43,7 @@ func (d *daemon) spawn(r *req) *rep {
 
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Dir = dir
-	if len(r.env) > 0 {
-		cmd.Env = r.env
-	}
+	cmd.Env = environ(r)
 	size := &pty.Winsize{Cols: uint16(r.cols), Rows: uint16(r.rows)}
 	if size.Cols == 0 {
 		size.Cols = 80
@@ -106,10 +104,16 @@ func (d *daemon) ptyWrite(r *req) *rep {
 		return fail(r, err)
 	}
 	n, err := h.pty.Write(r.data)
-	if err != nil {
+	if err != nil && n == 0 {
 		return fail(r, err)
 	}
-	return &rep{handle: r.handle, size: uint64(n)}
+	reply := &rep{handle: r.handle, size: uint64(n)}
+	if err != nil {
+		// Some of it went in, so the write happened: say how much, and why
+		// the rest did not.
+		reply.err = err.Error()
+	}
+	return reply
 }
 
 func (d *daemon) resize(r *req) *rep {
