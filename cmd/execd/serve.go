@@ -68,7 +68,12 @@ type handle struct {
 	done chan struct{} // opWatch: closed when its pump has returned
 }
 
+// newDaemon takes the descriptor over. It arrives inheritable, since that is
+// how it crossed the exec that started execd, and it crosses no other: a child
+// that held it could read requests meant for the daemon and answer in its
+// name.
 func newDaemon(fd int, r *root) *daemon {
+	unix.CloseOnExec(fd)
 	return &daemon{
 		root:    r,
 		ledger:  newLedger(ledgerMax, ledgerRoom),

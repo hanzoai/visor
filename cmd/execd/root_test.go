@@ -164,3 +164,24 @@ func TestRootTakesADotDotThatStaysInside(t *testing.T) {
 		t.Fatalf("got base %q", base)
 	}
 }
+
+// A write or a patch holds the directory of each file it names while it runs,
+// and a command may start meanwhile. That descriptor closes on exec like every
+// other the daemon opens, the workspace's own included.
+func TestRootParentClosesOnExec(t *testing.T) {
+	r, _ := tree(t)
+	for _, p := range []string{"top.go", "src/main.go"} {
+		fd, _, err := r.parent(p)
+		if err != nil {
+			t.Fatalf("%s: %v", p, err)
+		}
+		flags, err := unix.FcntlInt(uintptr(fd), unix.F_GETFD, 0)
+		unix.Close(fd)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if flags&unix.FD_CLOEXEC == 0 {
+			t.Errorf("the directory of %s is held without FD_CLOEXEC", p)
+		}
+	}
+}

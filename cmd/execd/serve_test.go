@@ -32,6 +32,7 @@ import (
 // it would on FD 3 under runsc.
 type host struct {
 	fd     int
+	peer   int // the daemon's end
 	root   *root
 	done   chan error
 	t      *testing.T
@@ -47,13 +48,18 @@ func serveTree(t *testing.T) *host {
 		t.Fatal(err)
 	}
 	mine, theirs := fds[0], fds[1]
+	// runsc hands FD 3 over without FD_CLOEXEC, or the exec that starts execd
+	// would close it, so the daemon's end arrives that way here too.
+	if _, err := unix.FcntlInt(uintptr(theirs), unix.F_SETFD, 0); err != nil {
+		t.Fatal(err)
+	}
 	unix.SetsockoptInt(mine, unix.SOL_SOCKET, unix.SO_SNDBUF, 4*frameMax)
 	unix.SetsockoptInt(theirs, unix.SOL_SOCKET, unix.SO_SNDBUF, 4*frameMax)
 	if err := unix.SetsockoptTimeval(mine, unix.SOL_SOCKET, unix.SO_RCVTIMEO, &unix.Timeval{Sec: 20}); err != nil {
 		t.Fatal(err)
 	}
 
-	h := &host{fd: mine, root: r, done: make(chan error, 1), t: t}
+	h := &host{fd: mine, peer: theirs, root: r, done: make(chan error, 1), t: t}
 	d := newDaemon(theirs, r)
 	go func() { h.done <- d.serve() }()
 	t.Cleanup(func() {
@@ -508,9 +514,12 @@ func TestAReadOverTheBoundIsRefusedWithItsSize(t *testing.T) {
 	}
 }
 
-// A repository above the workspace is not the workspace's repository. git's
-// ceiling has to name the workspace's parent for that to hold from the
-// workspace root, which is where a request that names no directory runs.
+// A repository above the workspace is not the workspace's repository, and
+// nothing in a request moves git to it. Not the directory git starts in: the
+// ceiling has to name the workspace's parent to stop the search there from the
+// workspace root, which is where a request that names no directory runs. Not
+// an option before the subcommand, even one behind an option execd does not
+// know. Not the environment.
 func TestGitCannotReachARepositoryAboveTheWorkspace(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git is not installed")
@@ -532,24 +541,83 @@ func TestGitCannotReachARepositoryAboveTheWorkspace(t *testing.T) {
 	outer(append(append([]string{}, sign...), "commit", "-q", "--allow-empty", "-m", "outer")...)
 	before := outer("rev-list", "--count", "HEAD")
 
-	for i, argv := range [][]string{
-		{"rev-parse", "--show-toplevel"},
-		{"log", "--oneline"},
-		append(append([]string{}, sign...), "commit", "--allow-empty", "-m", "written-from-inside"),
-		{"config", "--local", "execd.planted", "yes"},
+	gitDir := filepath.Join(above, ".git")
+	commit := append(append([]string{}, sign...), "commit", "--allow-empty", "-m", "written-from-inside")
+	plant := []string{"config", "--local", "execd.planted", "yes"}
+	for i, r := range []*req{
+		{argv: []string{"rev-parse", "--show-toplevel"}},
+		{argv: []string{"rev-parse", "--show-toplevel"}, dir: "src"},
+		{argv: []string{"log", "--oneline"}},
+		{argv: commit},
+		{argv: plant},
+		{argv: []string{"-C", "..", "rev-parse", "--show-toplevel"}},
+		{argv: append([]string{"-C", ".."}, plant...)},
+		{argv: append([]string{"-C", above}, commit...)},
+		{argv: append([]string{"-c", "core.quotePath=false", "-C", ".."}, plant...)},
+		{argv: append([]string{"--namespace", "n", "-C", ".."}, commit...)},
+		{argv: []string{"--git-dir=" + gitDir, "log", "--oneline"}},
+		{argv: append([]string{"--git-dir", gitDir, "--work-tree", above}, commit...)},
+		{argv: []string{"log", "--oneline"}, env: []string{"GIT_DIR=" + gitDir}},
+		{argv: commit, env: []string{"GIT_DIR=" + gitDir, "GIT_WORK_TREE=" + above}},
 	} {
-		if got := h.call(&req{op: opGit, id: uint64(i + 1), argv: argv}); got.exit == 0 {
-			t.Errorf("git %v reached the repository above the workspace: %q", argv, got.data)
+		r.op, r.id = opGit, uint64(i+1)
+		if got := h.call(r); got.exit == 0 {
+			t.Errorf("git %q in %q with env %q reached the repository above the workspace: %q", r.argv, r.dir, r.env, got.data)
 		}
-	}
-	if got := h.call(&req{op: opGit, id: 10, argv: []string{"rev-parse", "--show-toplevel"}, dir: "src"}); got.exit == 0 {
-		t.Errorf("git in a subdirectory reached %q", got.data)
 	}
 	if after := outer("rev-list", "--count", "HEAD"); after != before {
 		t.Fatalf("the repository above the workspace went from %s commits to %s", before, after)
 	}
 	if out := outer("config", "--local", "--list"); strings.Contains(out, "execd.planted") {
 		t.Fatalf("its config was written: %q", out)
+	}
+}
+
+// A request configures git with -c. Its environment names no file for git to
+// read: a GIT_* variable is refused, and a HOME finds no global file.
+func TestGitReadsNoConfigurationTheEnvironmentNames(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	h := serveTree(t)
+	outside := filepath.Join(filepath.Dir(h.root.name), "outside")
+	planted := filepath.Join(outside, ".gitconfig")
+	write(t, planted, "[user]\n\tname = planted\n")
+
+	for i, env := range [][]string{
+		{"GIT_CONFIG_GLOBAL=" + planted},
+		{"GIT_CONFIG_SYSTEM=" + planted},
+		{"HOME=" + outside},
+	} {
+		got := h.call(&req{op: opGit, id: uint64(i + 1), argv: []string{"config", "--get", "user.name"}, env: env})
+		if strings.Contains(string(got.data), "planted") {
+			t.Errorf("env %q chose git's configuration: %q", env, got.data)
+		}
+	}
+	got := h.call(&req{op: opGit, id: 10, argv: []string{"-c", "user.name=stated", "config", "--get", "user.name"}})
+	if strings.TrimSpace(string(got.data)) != "stated" {
+		t.Fatalf("-c user.name gave %q, exit %d err %q", got.data, got.exit, got.err)
+	}
+}
+
+// Before the subcommand git takes options that change how it reads and prints.
+// After it every word is the subcommand's: -C there is git log's copy
+// detection, not a directory.
+func TestGitTakesOptionsThatMoveNothing(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	h := serveTree(t)
+	sign := []string{"-c", "user.name=t", "-c", "user.email=t@example.com", "-c", "commit.gpgsign=false"}
+	for i, argv := range [][]string{
+		{"init", "-q"},
+		append(append([]string{}, sign...), "commit", "-q", "--allow-empty", "-m", "one"),
+		{"--no-pager", "--no-optional-locks", "log", "-C", "--oneline"},
+		{"-P", "--literal-pathspecs", "status", "--short"},
+	} {
+		if got := h.call(&req{op: opGit, id: uint64(i + 1), argv: argv}); got.exit != 0 || got.err != "" {
+			t.Fatalf("git %q: exit %d err %q %s", argv, got.exit, got.err, got.log)
+		}
 	}
 }
 
@@ -835,6 +903,39 @@ func TestAChildGetsADeclaredEnvironment(t *testing.T) {
 		env: []string{"ONLY=this"}})
 	if want := "this\n[]\n"; string(got.data) != want {
 		t.Fatalf("got %q want %q", got.data, want)
+	}
+}
+
+// The host's socket crosses one exec, the one that starts the daemon, and no
+// other. A child that held it could read requests meant for the daemon and
+// answer in its name.
+func TestAChildDoesNotHoldTheHostSocket(t *testing.T) {
+	h := serveTree(t)
+	var st unix.Stat_t
+	if err := unix.Fstat(h.peer, &st); err != nil {
+		t.Fatal(err)
+	}
+	sock := fmt.Sprintf("socket:[%d]", st.Ino)
+	const list = "ls -l /proc/self/fd"
+
+	got := h.call(&req{op: opExec, id: 1, command: list})
+	if got.exit != 0 || got.err != "" {
+		t.Fatalf("exec: exit %d err %q %s", got.exit, got.err, got.log)
+	}
+	if strings.Contains(string(got.data), sock) {
+		t.Errorf("a command holds the host socket, %s:\n%s", sock, got.data)
+	}
+
+	start := h.call(&req{op: opSpawn, id: 2, command: list})
+	if start.err != "" {
+		t.Fatalf("spawn: %s", start.err)
+	}
+	var out strings.Builder
+	for got := h.next(); got.kind != kindExit; got = h.next() {
+		out.Write(got.data)
+	}
+	if strings.Contains(out.String(), sock) {
+		t.Errorf("a pty's process holds the host socket, %s:\n%s", sock, out.String())
 	}
 }
 

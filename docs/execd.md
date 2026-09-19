@@ -64,6 +64,10 @@ Two things to keep true:
 - Nothing else may be handed in below FD 3, or the numbering shifts. `execd`
   takes `-fd` for the case where the host cannot place it at 3.
 
+`execd` sets `FD_CLOEXEC` on the descriptor as it starts. The socket crosses
+the exec that starts `execd` and no other: a command `execd` runs gets its
+stdio, and cannot read a request meant for `execd` or answer one in its name.
+
 The host keeps `mine` and speaks ZAP on it. A zero-length packet is a packet
 like any other and asks for nothing — it is the socket, not a length, that says
 the host has hung up. When it has, every pty is killed, every watch is closed
@@ -90,7 +94,7 @@ replies can arrive in any order — match on the id, never on arrival order.
 | `list` | 9 | `path`, `off` (first index), `length` (count) | `entries`, `size` (the whole count) |
 | `watch` | 10 | `path` | `handle`, `path` (resolved) |
 | `patch` | 11 | `data` (a unified diff) | `entries` (the files changed), `size` |
-| `git` | 12 | `argv`, `dir`, `timeout` | `exit`, `data`, `log` |
+| `git` | 12 | `argv`, `dir`, `env`, `timeout` | `exit`, `data`, `log` |
 
 `mode` is permission bits — `0644`, `0755` — in a request and in every reply
 that carries one. Whether a path is a directory is `flags`, not the mode.
@@ -162,17 +166,34 @@ A `..` that stays beneath the workspace resolves normally, so `src/../src/main.g
 is `src/main.go`; so does a relative symlink that stays beneath it.
 
 `exec` and `git` take their working directory the same way, and run in the
-resolved directory.
+resolved directory. For `git`, `dir` is the only thing in a request that says
+where it works:
+
+- Before the subcommand, `argv` takes `-c` and the options that change how git
+  reads and prints: `-P`, `--no-pager`, `--no-optional-locks`,
+  `--no-replace-objects` and the `--*-pathspecs` switches. `-C`, `--git-dir`,
+  `--work-tree`, `--exec-path` and any option not listed are refused; one that
+  is not listed might take a value and hide the option after it.
+- A `GIT_*` variable in `env` is refused. `GIT_DIR`, `GIT_WORK_TREE` or a
+  `GIT_CONFIG_*` would name a place of the request's choosing; `-c` says how
+  git is configured.
+- git reads the repository's configuration, the system's and what `-c` states.
+  `GIT_CONFIG_GLOBAL` is `/dev/null`, so a `HOME` in `env` picks no file.
+
+After the subcommand every word is git's own: `git log -C` is copy detection,
+and a path a subcommand is given, like the directory of `git init <dir>`, is
+git's to resolve, as a path in `exec`'s `argv` is.
 
 `git` gets `GIT_CEILING_DIRECTORIES` set to the workspace's **parent**, not to
 the workspace. git stops a repository search at a ceiling directory on the way
 up, and a ceiling equal to the directory the search starts from is never on
 that way — so a ceiling of the workspace itself would leave a request that runs
 at the workspace root free to find, read and write a repository above it. With
-the parent as the ceiling, a request that names no repository fails in the
-workspace, from the root and from any directory under it.
-`GIT_DISCOVERY_ACROSS_FILESYSTEM=0` is set as well. `git` takes `argv` only: a
-command string for a shell is refused.
+the parent as the ceiling, the search ends at the workspace, from the root and
+from any directory under it. What it finds there git follows as it always
+does: a `.git` file or a `core.worktree` in the workspace that names a place
+outside it takes git there. `GIT_DISCOVERY_ACROSS_FILESYSTEM=0` is set as well.
+`git` takes `argv` only: a command string for a shell is refused.
 
 A child starts from a declared environment — `PATH`, `LANG`, `TERM` — or from
 the `env` the request names, and never from the daemon's own, so nothing the
@@ -238,8 +259,8 @@ pretend about on another kernel.
 
 ## Tests
 
-The tests need no visor and no root. They make a socketpair in-process, run
-the daemon on one end and speak ZAP on the other — the same code path as FD 3
-under runsc:
+The tests need no visor and no root. They make a socketpair in-process, hand
+the daemon one end without `FD_CLOEXEC`, as runsc hands over FD 3, and speak
+ZAP on the other — the same code path as FD 3 under runsc:
 
     go test ./cmd/execd

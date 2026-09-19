@@ -111,7 +111,7 @@ func (r *root) parent(p string) (int, string, error) {
 		return -1, "", fmt.Errorf("%s: not a file name", p)
 	}
 	if dir == "" {
-		fd, err := unix.Dup(r.fd)
+		fd, err := unix.FcntlInt(uintptr(r.fd), unix.F_DUPFD_CLOEXEC, 0)
 		if err != nil {
 			return -1, "", err
 		}
