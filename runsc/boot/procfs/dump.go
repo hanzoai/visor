@@ -66,7 +66,6 @@ type Stat struct {
 	SID  int32 `json:"sid"`
 }
 
-// Mapping contains information for /proc/[pid]/maps.
 // Range is a mapping's address range. It restates hostarch.AddrRange, whose
 // bounds are uintptr: an address is a number here, and a uintptr has no width
 // two ends of a wire can agree on.
@@ -80,6 +79,7 @@ func (r Range) Overlaps(o Range) bool {
 	return r.Start < o.End && o.Start < r.End
 }
 
+// Mapping contains information for /proc/[pid]/maps.
 type Mapping struct {
 	Address     Range               `json:"address,omitempty"`
 	Permissions hostarch.AccessType `json:"permissions"`

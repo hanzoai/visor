@@ -18,6 +18,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -37,7 +38,7 @@ import (
 
 func remoteSinkConfig(endpoint string) seccheck.SinkConfig {
 	return seccheck.SinkConfig{
-		Name: "remote",
+		Name:   "remote",
 		Config: json.RawMessage(fmt.Sprintf(`{"endpoint": %q}`, endpoint)),
 	}
 }
@@ -407,8 +408,9 @@ func TestProcfsDump(t *testing.T) {
 		t.Errorf("expected root to be %q, but got %q", want, procfsDump[0].Root)
 	}
 
-	if got := procfsDump[0].Limits["RLIMIT_NOFILE"]; got != fdLimit {
-		t.Errorf("expected FD limit to be %+v, but got %+v", fdLimit, got)
+	want := []limits.Rlimit{{Name: "RLIMIT_NOFILE", Limit: fdLimit}}
+	if got := procfsDump[0].Limits; !reflect.DeepEqual(got, want) {
+		t.Errorf("expected FD limit to be %+v, but got %+v", want, got)
 	}
 
 	wantCgroup := []kernel.TaskCgroupEntry{

@@ -85,6 +85,11 @@ type Subnet struct {
 	Mask net.IPMask
 }
 
+// String renders the subnet in CIDR notation.
+func (s Subnet) String() string {
+	return (&net.IPNet{IP: s.IP, Mask: s.Mask}).String()
+}
+
 // Route represents a route in the network stack.
 type Route struct {
 	Destination Subnet

@@ -96,6 +96,7 @@ go_test(
     name = "control_test",
     size = "small",
     srcs = [
+        "exec_test.go",
         "fs_test.go",
         "proc_test.go",
     ],
@@ -110,6 +111,7 @@ go_test(
         "//pkg/sentry/ktime",
         "//pkg/sentry/usage",
         "//pkg/sentry/vfs",
+        "//pkg/urpc",
         "//pkg/usermem",
     ],
 )

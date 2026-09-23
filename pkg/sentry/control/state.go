@@ -132,6 +132,9 @@ type Pair struct {
 
 // Pairs restates a map as the list that crosses.
 func Pairs(m map[string]string) []Pair {
+	if len(m) == 0 {
+		return nil
+	}
 	ps := make([]Pair, 0, len(m))
 	for k, v := range m {
 		ps = append(ps, Pair{Key: k, Value: v})

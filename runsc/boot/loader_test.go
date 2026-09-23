@@ -33,6 +33,7 @@ import (
 	"gvisor.dev/gvisor/pkg/fspath"
 	"gvisor.dev/gvisor/pkg/lisafs"
 	"gvisor.dev/gvisor/pkg/log"
+	"gvisor.dev/gvisor/pkg/sentry/control"
 	"gvisor.dev/gvisor/pkg/sentry/kernel/auth"
 	"gvisor.dev/gvisor/pkg/sentry/seccheck"
 	"gvisor.dev/gvisor/pkg/sentry/vfs"
@@ -232,8 +233,7 @@ func TestStartSignal(t *testing.T) {
 	}
 
 	// Trigger the control server StartRoot method.
-	cid := "foo"
-	if err := l.ctrl.manager.StartRoot(&cid, nil); err != nil {
+	if err := l.ctrl.manager.StartRoot(&control.ContainerArgs{ContainerID: "foo"}, nil); err != nil {
 		t.Errorf("error calling StartRoot: %v", err)
 	}
 

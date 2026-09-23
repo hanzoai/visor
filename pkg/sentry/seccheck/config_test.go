@@ -191,7 +191,7 @@ func TestFailure(t *testing.T) {
 
 func TestExecveHashCacheConfig(t *testing.T) {
 	conf := SessionConfig{
-		Name: "Default",
+		Name:    "Default",
 		Options: Options{ExecveHashCacheCapacity: 1024},
 		Points: []PointConfig{
 			{

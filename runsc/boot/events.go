@@ -79,12 +79,12 @@ type MemoryEntry struct {
 
 // Memory contains stats on memory.
 type Memory struct {
-	Cache     uint64            `json:"cache,omitempty"`
-	Usage     MemoryEntry       `json:"usage,omitempty"`
-	Swap      MemoryEntry       `json:"swap,omitempty"`
-	Kernel    MemoryEntry       `json:"kernel,omitempty"`
-	KernelTCP MemoryEntry       `json:"kernelTCP,omitempty"`
-	Raw       []Stat            `json:"raw,omitempty"`
+	Cache     uint64      `json:"cache,omitempty"`
+	Usage     MemoryEntry `json:"usage,omitempty"`
+	Swap      MemoryEntry `json:"swap,omitempty"`
+	Kernel    MemoryEntry `json:"kernel,omitempty"`
+	KernelTCP MemoryEntry `json:"kernelTCP,omitempty"`
+	Raw       []Stat      `json:"raw,omitempty"`
 }
 
 // CPU contains stats on the CPU.

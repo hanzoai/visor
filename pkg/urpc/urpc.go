@@ -675,7 +675,13 @@ func unmarshal(s *unet.Socket, v Wire) ([]*os.File, error) {
 		fs = append(fs, os.NewFile(uintptr(fd), "urpc"))
 	}
 
-	size := int(binary.LittleEndian.Uint32(head[12:16]))
+	// A ZAP header is the magic, the version, and the whole message's length
+	// in its last four bytes.
+	if string(head[:len(zap.Magic)]) != zap.Magic {
+		closeAll(fs)
+		return nil, zap.ErrInvalidMagic
+	}
+	size := int(binary.LittleEndian.Uint32(head[zap.HeaderSize-4:]))
 	if size < zap.HeaderSize || size > maxMessage {
 		closeAll(fs)
 		return nil, ErrTooLarge
@@ -733,19 +739,25 @@ func (c *Client) Call(method string, arg any, result any) error {
 		return fmt.Errorf("urpc method %q failed: %v", method, err)
 	}
 
-	// Set the file payload.
+	// Did an error occur?
+	if !callR.Success {
+		closeAll(newFs)
+		return RemoteError{Message: callR.Err}
+	}
+
+	if err := decode(result, callR.Result); err != nil {
+		closeAll(newFs)
+		return err
+	}
+
+	// The files arrive beside the message, so they are set last: reading the
+	// result writes every field the layout states, this one included.
 	if fp, ok := result.(filePayloader); ok {
 		fp.setFilePayload(newFs)
 	} else {
 		closeAll(newFs)
 	}
-
-	// Did an error occur?
-	if !callR.Success {
-		return RemoteError{Message: callR.Err}
-	}
-
-	return decode(result, callR.Result)
+	return nil
 }
 
 // Close closes the underlying socket.

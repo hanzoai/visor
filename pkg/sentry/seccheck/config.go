@@ -57,7 +57,7 @@ type SessionConfig struct {
 	// Sinks are the sinks that will process the points enabled above.
 	Sinks []SinkConfig `json:"sinks,omitempty"`
 	// Options holds session-level configuration options.
-	Options Options `json:"options,omitempty"`
+	Options Options `json:"options"`
 }
 
 // PointConfig describes a point to be enabled in a given session.

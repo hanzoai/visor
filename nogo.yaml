@@ -5,7 +5,7 @@ groups:
   # checks on generated and external code, so enable those cases
   # selectively for analyzers below.
   - name: generated
-    regex: "^(bazel-genfiles|bazel-out|bazel-bin)/"
+    regex: "^(bazel-genfiles|bazel-out|bazel-bin)/|(^|/)zap\\.go$"
     default: true
   - name: external
     regex: "^external/"
@@ -263,6 +263,14 @@ analyzers:
     internal:
       exclude:
         - pkg/gohacks/noescape_unsafe.go # x ^ 0 always equals x.
+  ST1016: # Methods on the same type should have the same receiver name.
+    internal:
+      # Every type that states its ZAP wire gets two methods written by
+      # //tools/zap, which names its receiver the same in all of them. A type
+      # whose hand-written methods name theirs anything else is then reported
+      # against the hand-written file, so the finding never reaches the
+      # generated one.
+      exclude: [".*"]
   ST1019: # Multiple imports of the same package.
     generated:
       exclude:

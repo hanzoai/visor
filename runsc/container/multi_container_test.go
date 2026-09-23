@@ -2459,12 +2459,12 @@ func TestMultiContainerEvent(t *testing.T) {
 
 				if name == "enableCgroupsV2" {
 					// In cgroup v2, cpu.stat accumulates CPU usage even after tasks exit.
-					if exited := ret.ContainerUsage[containers[2].ID]; exited == 0 {
+					if exited := ret.CPU(containers[2].ID); exited == 0 {
 						t.Errorf("Exited container in cgroup v2 should report non-zero CPU usage, got: %d", exited)
 					}
 				} else {
 					// Without cgroup v2, sentry accounting only counts live thread groups.
-					if exited := ret.ContainerUsage[containers[2].ID]; exited != 0 {
+					if exited := ret.CPU(containers[2].ID); exited != 0 {
 						t.Errorf("Exited container should report 0 CPU usage, got: %d", exited)
 					}
 				}

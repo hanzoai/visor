@@ -16,6 +16,7 @@
 package trace
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -57,10 +58,8 @@ func TestAll(t *testing.T) {
 		t.Fatal(err)
 	}
 	builder.AddSink(seccheck.SinkConfig{
-		Name: "remote",
-		Config: map[string]any{
-			"endpoint": server.Endpoint,
-		},
+		Name:   "remote",
+		Config: json.RawMessage(fmt.Sprintf(`{"endpoint": %q}`, server.Endpoint)),
 	})
 
 	cfgFile, err := os.CreateTemp(testutil.TmpDir(), "config")
