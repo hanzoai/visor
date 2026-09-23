@@ -34,7 +34,8 @@ require (
 	github.com/opencontainers/runtime-spec v1.2.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/vishvananda/netlink v1.3.1-0.20250303224720-0e7078ed04c8
-	github.com/zap-proto/go v1.8.0
+	github.com/zap-proto/go v1.8.3
+	github.com/zap-proto/zip v1.36.49
 	golang.org/x/exp v0.0.0-20260312153236-7ab1446f8b90
 	golang.org/x/mod v0.36.0
 	golang.org/x/sync v0.20.0
@@ -73,7 +74,6 @@ require (
 	github.com/zap-proto/fiber/v3 v3.2.1 // indirect
 	github.com/zap-proto/http v0.3.5 // indirect
 	github.com/zap-proto/mcp v1.0.5 // indirect
-	github.com/zap-proto/zip v1.36.47-0.20260911003408-2f5a38795b58 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 )
 
@@ -130,7 +130,6 @@ require (
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
 	github.com/vishvananda/netns v0.0.5 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
-	github.com/zap-proto/go v1.8.3
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.39.0 // indirect
